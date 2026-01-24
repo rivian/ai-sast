@@ -1,0 +1,111 @@
+# AI-SAST Default Security Scanning Prompt
+
+This file contains the default prompt used by AI-SAST for security vulnerability analysis. You can customize the scanning behavior by setting the `AI_SAST_CUSTOM_PROMPT` environment variable, which will append your custom instructions to this base prompt.
+
+## Base Prompt
+
+As a cybersecurity expert, analyze the following source code for security vulnerabilities. Only report findings if you have a high level of confidence the finding is exploitable. Do not make assumptions or infer anything that is not explicitly apparent in the code being reviewed.
+
+File: {file_path}
+Language: {language}
+
+Code:
+```{language}
+{code_content}
+```
+
+## Data Flow Analysis Requirements:
+
+**1. SOURCE IDENTIFICATION**: Identify all user-controllable inputs in this file:
+- Function parameters from external calls
+- Command-line arguments
+- HTTP request data (headers, query params, body)
+- File contents read from user-specified paths
+- Database query results from user input
+- Variables or inputs which are sourced from CI/CD variables or other configuration files are considered secure. Focus on user provided inputs. 
+
+**2. SINK IDENTIFICATION**: Identify dangerous operations that could be exploited:
+- Network requests (fetch, axios, http.request, etc.)
+- URL construction functions
+- Path resolution functions
+
+**3. CROSS-FILE FLOW TRACING**: For each potential vulnerability:
+- **Entry Point**: Where does untrusted data enter the system?
+- **Flow Path**: Trace the data through function calls, imports, and exports
+- **Intermediate Processing**: What validation/sanitization occurs along the path?
+- **Exploitation Point**: Where does the untrusted data reach a dangerous sink?
+
+**4. MULTI-FILE CONTEXT**: When analyzing imports/exports/function calls:
+- Identify which imported functions likely receive the traced data
+- Specify which additional files would need to be analyzed to confirm exploitability
+
+## Response Format:
+
+Format your response for each finding as:
+- **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
+- **Issue**: Brief description of the vulnerability.
+- **Location**: File name which the vulnerability exists and any associated file names which are involved in the vulnerability. If not applicable, use "N/A".
+- **CVSS Vector**: The full CVSS v3.1 vector string (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H").
+- **Risk**: A brief explanation of the security impact.
+- **Fix**: Specific remediation steps, including a secure code example.
+
+
+## Multi-File Analysis Guidelines:
+
+1. **Follow Imports**: When you see imports like `import {{ getToken }} from './utils/get-token'`, analyze how the imported function likely uses its parameters
+
+2. **Trace Function Calls**: For each function call with user data, determine:
+   - What file defines the function?
+   - How is the parameter likely processed?
+   - Does it reach a dangerous sink?
+
+3. **Do not Infer Missing Context**: When source files aren't provided, move on and do not infer missing context.
+
+4. **Chain Validation**: Identify where in the multi-file chain validation should be added
+
+5. Focus on vulnerabilities that are proven to be exploitable.
+
+{custom_instructions}
+
+---
+
+## Customizing the Prompt
+
+You can customize scanning behavior by setting the `AI_SAST_PROMPT` environment variable:
+
+```bash
+# Focus on specific vulnerability types
+export AI_SAST_PROMPT="Focus primarily on SQL injection and XSS vulnerabilities"
+
+# Ignore specific areas
+export AI_SAST_PROMPT="Ignore issues in legacy code modules. Prioritize new API endpoints."
+
+# Adjust sensitivity
+export AI_SAST_PROMPT="Only report CRITICAL and HIGH severity issues with direct exploit paths"
+
+# Domain-specific guidance
+export AI_SAST_PROMPT="Pay special attention to authentication and authorization logic. Review all JWT token handling."
+```
+
+Your custom instructions will be appended to the base prompt above, providing additional context to the AI model.
+
+## Prompt Design Philosophy
+
+This prompt is designed to:
+
+1. **Minimize False Positives**: Requires high confidence and exploitability
+2. **Data Flow Focus**: Emphasizes tracing user input through the code
+3. **Multi-File Awareness**: Considers cross-file vulnerabilities
+4. **Structured Output**: Ensures consistent, parseable results with CVSS scoring
+5. **Actionable Findings**: Provides specific remediation guidance
+
+## Modifying the Base Prompt
+
+If you need to modify the base prompt (not just append custom instructions), you can:
+
+1. **Fork and modify this file**: Edit `prompts/default_prompt.txt` directly
+2. **Update scanner.py**: The prompt is loaded from this file at runtime
+3. **Test thoroughly**: Changes to the base prompt can significantly affect scanning accuracy
+
+⚠️ **Warning**: Modifying the base prompt may affect the quality and consistency of vulnerability detection. Test changes thoroughly before using in production.
+
