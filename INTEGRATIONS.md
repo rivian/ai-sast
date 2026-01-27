@@ -1,21 +1,26 @@
-# Optional Integrations Guide
+# Integrations Guide
 
-AI-SAST supports optional integrations with external tools to enhance scanning capabilities. All integrations are **optional** and the scanner works perfectly fine without them.
+AI-SAST has built-in SQLite storage for scan results and feedback. External integrations are optional.
 
-## Available Integrations
+## Built-in SQLite Database
 
-### 1. Jira Integration
-Fetch vulnerability context from your Jira instance to inform AI analysis.
+**Default location:** `~/.ai-sast/scans.db`
 
-### 2. Databricks Integration  
-Use historical false positive and confirmed vulnerability data to improve scan accuracy over time.
+**Stores:**
+- Scan results (vulnerabilities found)
+- Developer feedback (true/false positives)
 
-### 3. Vector/Log Aggregator Integration
-Send security scan events to your centralized logging system (Splunk HEC, Vector, etc.)
+**Configuration:**
+```bash
+# Optional: Custom location
+export AI_SAST_DB_PATH="/path/to/scans.db"
+```
+
+**No setup required** - works automatically!
 
 ---
 
-## 1. Jira Integration
+## 1. Jira Integration (Optional)
 
 ### Purpose
 - Fetch known vulnerabilities from your Jira tracking system
@@ -86,114 +91,45 @@ The scanner will use this query to fetch context from Jira.
 
 ---
 
-## 2. Databricks Integration
+## 2. Databricks Integration (Optional - Enterprise Only)
 
-### Purpose
-- Learn from historical scan results
-- Reduce false positives over time
-- Highlight patterns similar to confirmed vulnerabilities
-- Create a feedback loop for continuous improvement
+For enterprises needing centralized storage across multiple teams.
+
+**When to use:** Large teams, centralized analytics, existing Databricks infrastructure
 
 ### Setup
 
-#### Install Databricks dependency:
 ```bash
 pip install databricks-sql-connector>=2.9.0
-```
 
-#### Configure environment variables:
-```bash
+export AI_SAST_FEEDBACK_BACKEND="databricks"
 export AI_SAST_DATABRICKS_HOST="your-workspace.cloud.databricks.com"
 export AI_SAST_DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/abc123"
-export AI_SAST_DATABRICKS_TOKEN="your-databricks-token"
-export AI_SAST_DATABRICKS_CATALOG="my_catalog"          # Required: Your catalog name
-export AI_SAST_DATABRICKS_SCHEMA="my_schema"            # Required: Your schema name
-export AI_SAST_DATABRICKS_TABLE="my_feedback_table"     # Required: Your table name
+export AI_SAST_DATABRICKS_TOKEN="your-token"
+export AI_SAST_DATABRICKS_CATALOG="security"
+export AI_SAST_DATABRICKS_SCHEMA="sast"
+export AI_SAST_DATABRICKS_TABLE="feedback"
 ```
 
-#### Get Databricks Token:
-1. Go to your Databricks workspace
-2. Click Settings > User Settings
-3. Go to Access Tokens tab
-4. Generate new token
-
-### Database Schema
-
-Create a table in your Databricks workspace to store feedback. You can customize the catalog, schema, and table names:
+### Table Schema
 
 ```sql
-CREATE TABLE IF NOT EXISTS my_catalog.my_schema.my_feedback_table (
+CREATE TABLE feedback (
     timestamp TIMESTAMP,
     repository STRING,
     vuln_id STRING,
     issue STRING,
     severity STRING,
     file_path STRING,
-    location STRING,
-    status STRING,          -- 'False Positive', 'Confirmed', 'Needs Triage'
+    status STRING,  -- 'False Positive' or 'Confirmed'
     comments STRING,
     user STRING
 );
 ```
 
-**Note**: Replace `my_catalog`, `my_schema`, and `my_feedback_table` with your actual names, then configure the environment variables accordingly.
-
-### Usage
-
-The scanner automatically fetches feedback if configured:
-
-```python
-from src.core.scanner import SecurityScanner
-
-# Scanner will fetch historical feedback for the repository
-scanner = SecurityScanner(repo_url="https://github.com/org/repo")
-results = scanner.scan_directory("./src")
-```
-
-### How It Works
-
-1. Scanner fetches last 90 days of feedback for the repository
-2. False positives: AI learns to avoid similar patterns
-3. Confirmed vulnerabilities: AI pays extra attention to similar code
-4. Feedback is included in the AI prompt context
-
-### Recording Feedback
-
-Log feedback to Databricks when triaging scan results:
-
-```sql
--- Mark as false positive (use your table name)
-INSERT INTO my_catalog.my_schema.my_feedback_table VALUES (
-    current_timestamp(),
-    'https://github.com/org/repo',
-    'abc12345',
-    'SQL Injection in user_controller.py',
-    'HIGH',
-    'src/user_controller.py',
-    'Line 42',
-    'False Positive',
-    'Uses parameterized queries - not exploitable',
-    'security_team@company.com'
-);
-
--- Confirm vulnerability (use your table name)
-INSERT INTO my_catalog.my_schema.my_feedback_table VALUES (
-    current_timestamp(),
-    'https://github.com/org/repo',
-    'def67890',
-    'XSS in dashboard.js',
-    'CRITICAL',
-    'src/dashboard.js',
-    'Line 108',
-    'Confirmed',
-    'Verified exploitable - fix required',
-    'security_team@company.com'
-);
-```
-
 ---
 
-## 3. Vector/Log Aggregator Integration
+## 3. Vector/Log Aggregation (Optional)
 
 ### Purpose
 - Centralize security scan events
@@ -329,11 +265,10 @@ The scanner will work normally without any integrations!
 
 ## Summary
 
-| Integration | Purpose | Required Packages | Optional |
-|-------------|---------|-------------------|----------|
-| Jira | Vulnerability context | `jira>=3.10.5` | ✅ Yes |
-| Databricks | Historical feedback | `databricks-sql-connector>=2.9.0` | ✅ Yes |
-| Vector | Centralized logging | Built-in (`requests`) | ✅ Yes |
-
-All integrations enhance the scanner but are **completely optional**!
+| Integration | Purpose | Default |
+|-------------|---------|---------|
+| SQLite | Scan results & feedback storage | ✅ Built-in |
+| Jira | Vulnerability context | Optional |
+| Databricks | Enterprise centralized storage | Optional |
+| Vector | Centralized logging (Splunk, etc.) | Optional |
 

@@ -73,7 +73,7 @@ def verify_github_signature(request) -> bool:
     return True
 
 
-def store_feedback_in_databricks(
+def store_feedback_in_database(
     repo_url: str,
     pr_number: int,
     file_path: str,
@@ -88,7 +88,7 @@ def store_feedback_in_databricks(
     updated_timestamp: str = ""
 ) -> bool:
     """
-    Store feedback in Databricks using the databricks_client.
+    Store feedback in the configured backend (SQLite or Databricks).
     
     Args:
         repo_url: Repository URL
@@ -108,18 +108,18 @@ def store_feedback_in_databricks(
         True if successful, False otherwise
     """
     try:
-        # Import databricks client
+        # Import feedback client
         import sys
         sys.path.insert(0, '/app/src')  # Adjust path based on Docker container structure
-        from integrations.databricks import DatabricksClient
+        from integrations.feedback import get_feedback_client
         
-        databricks_client = DatabricksClient()
+        feedback_client = get_feedback_client()
         
-        if not databricks_client.is_configured:
-            logger.warning("⚠️ Databricks not configured, cannot store feedback")
+        if not feedback_client.is_configured:
+            logger.warning("⚠️ Feedback system not configured, cannot store feedback")
             return False
         
-        success = databricks_client.store_feedback(
+        success = feedback_client.store_feedback(
             repo_url=repo_url,
             pr_number=pr_number,
             file_path=file_path,
@@ -132,11 +132,11 @@ def store_feedback_in_databricks(
             location=location
         )
         
-        databricks_client.close()
+        feedback_client.close()
         return success
         
     except Exception as e:
-        logger.error(f"❌ Failed to store feedback in Databricks: {e}")
+        logger.error(f"❌ Failed to store feedback: {e}")
         return False
 
 
@@ -209,8 +209,8 @@ def handle_feedback(
     pr_number_match = re.search(r'/pull/(\d+)', pr_url)
     pr_number = int(pr_number_match.group(1)) if pr_number_match else 0
     
-    # Store in Databricks
-    success = store_feedback_in_databricks(
+    # Store in feedback database
+    success = store_feedback_in_database(
         repo_url=pr_url.rsplit('/pull/', 1)[0],  # Get repo URL without PR path
         pr_number=pr_number,
         file_path=file_path,

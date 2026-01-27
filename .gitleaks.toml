@@ -1,0 +1,19 @@
+# Gitleaks configuration
+title = "AI-SAST Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlisted files and patterns"
+paths = [
+  '''\.git/''',
+  '''node_modules/''',
+  '''vendor/''',
+]
+
+# Add patterns to ignore if needed
+regexes = [
+  # Example patterns to ignore
+  # '''EXAMPLE_TOKEN_[A-Z0-9]+'''
+]

@@ -31,11 +31,11 @@ except ImportError:
     JiraClient = None
 
 try:
-    from ..integrations.databricks import DatabricksClient
-    DATABRICKS_AVAILABLE = True
+    from ..integrations.feedback import get_feedback_client
+    FEEDBACK_AVAILABLE = True
 except ImportError:
-    DATABRICKS_AVAILABLE = False
-    DatabricksClient = None
+    FEEDBACK_AVAILABLE = False
+    get_feedback_client = None
 
 
 class SecurityScanner:
@@ -108,11 +108,11 @@ Format your response for each finding as:
         if JIRA_AVAILABLE:
             self._init_jira_client()
         
-        # Optional Databricks integration
-        self.databricks_client: Optional[DatabricksClient] = None
+        # Feedback system (SQLite or Databricks)
+        self.feedback_client = None
         self.feedback_context = ""
-        if DATABRICKS_AVAILABLE:
-            self._init_databricks_client()
+        if FEEDBACK_AVAILABLE:
+            self._init_feedback_client()
         
         # Load default prompt from file
         self.DEFAULT_PROMPT = self._load_default_prompt()
@@ -186,53 +186,54 @@ Format your response for each finding as:
             print(f"⚠️ Warning: Failed to fetch Jira context: {e}")
             return ""
 
-    def _init_databricks_client(self):
-        """Initializes the Databricks client if configuration is provided."""
+    def _init_feedback_client(self):
+        """Initializes the feedback client (SQLite or Databricks)."""
         try:
-            self.databricks_client = DatabricksClient()
-            if self.databricks_client.is_configured:
-                self.feedback_context = self._get_feedback_context_from_databricks()
+            self.feedback_client = get_feedback_client()
+            if self.feedback_client and self.feedback_client.is_configured:
+                self.feedback_context = self._get_feedback_context()
             else:
-                print("ℹ️ Databricks not configured - skipping feedback retrieval")
+                print("ℹ️ Feedback system not configured - skipping feedback retrieval")
         except Exception as e:
-            print(f"⚠️ Warning: Failed to initialize Databricks: {e}")
-            self.databricks_client = None
+            print(f"⚠️ Warning: Failed to initialize feedback client: {e}")
+            self.feedback_client = None
 
-    def _get_feedback_context_from_databricks(self) -> str:
-        """Fetches and formats feedback context from Databricks."""
-        if not self.databricks_client or not self.databricks_client.is_configured:
+    def _get_feedback_context(self) -> str:
+        """Fetches and formats feedback context from the feedback system."""
+        if not self.feedback_client or not self.feedback_client.is_configured:
             return ""
         
         if not self.repo_url:
-            print("ℹ️ No repository URL provided. Skipping Databricks feedback fetch.")
+            print("ℹ️ No repository URL provided. Skipping feedback fetch.")
             return ""
         
         try:
             print(f"Fetching feedback for: {self.repo_url}")
             
             # Fetch false positives
-            false_positives = self.databricks_client.get_false_positives_for_project(
+            false_positives = self.feedback_client.get_false_positives_for_project(
                 self.repo_url,
                 days_back=90,
                 limit=50
             )
             
             # Fetch confirmed vulnerabilities
-            confirmed_vulnerabilities = self.databricks_client.get_confirmed_vulnerabilities_for_project(
+            confirmed_vulnerabilities = self.feedback_client.get_confirmed_vulnerabilities_for_project(
                 self.repo_url,
                 days_back=90,
                 limit=50
             )
             
             # Format context
-            context = self.databricks_client.format_feedback_for_context(
+            context = self.feedback_client.format_feedback_for_context(
                 false_positives,
                 confirmed_vulnerabilities
             )
             
             if context:
                 total = len(false_positives) + len(confirmed_vulnerabilities)
-                print(f"✅ Loaded {total} feedback record(s) from Databricks")
+                backend_name = type(self.feedback_client).__name__
+                print(f"✅ Loaded {total} feedback record(s) from {backend_name}")
             
             return context
             

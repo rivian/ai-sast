@@ -18,7 +18,7 @@ from typing import List, Dict, Optional
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from integrations.databricks import DatabricksClient
+from integrations.feedback import get_feedback_client
 
 
 def parse_feedback_from_comment(comment_body: str) -> List[Dict]:
@@ -170,13 +170,14 @@ def main():
     print(f"📍 Repository: {repo_url}")
     print(f"📍 PR: #{pr_number}")
     
-    # Initialize Databricks client
-    print("\n🔌 Connecting to Databricks...")
-    databricks_client = DatabricksClient()
+    # Initialize feedback client (SQLite or Databricks)
+    print("\n🔌 Initializing feedback system...")
+    feedback_client = get_feedback_client()
     
-    if not databricks_client.is_configured:
-        print("⚠️  Databricks not configured - feedback will not be stored")
-        print("   To enable feedback storage, set these environment variables:")
+    if not feedback_client.is_configured:
+        print("⚠️  Feedback system not configured - feedback will not be stored")
+        print("   By default, feedback is stored in SQLite at ~/.ai-sast/feedback.db")
+        print("   To use Databricks instead, set these environment variables:")
         print("   - AI_SAST_DATABRICKS_HOST")
         print("   - AI_SAST_DATABRICKS_HTTP_PATH")
         print("   - AI_SAST_DATABRICKS_TOKEN")
@@ -185,15 +186,18 @@ def main():
         print("   - AI_SAST_DATABRICKS_TABLE")
         sys.exit(0)
     
+    backend_name = type(feedback_client).__name__
+    print(f"✅ Using {backend_name} for feedback storage")
+    
     # Store feedback
-    print("\n💾 Storing feedback in Databricks...")
-    success_count = databricks_client.store_batch_feedback(
+    print("\n💾 Storing feedback...")
+    success_count = feedback_client.store_batch_feedback(
         repo_url=repo_url,
         pr_number=pr_number,
         feedback_list=feedback_list
     )
     
-    databricks_client.close()
+    feedback_client.close()
     
     # Summary
     print(f"\n✅ Successfully stored {success_count}/{len(feedback_list)} feedback records")

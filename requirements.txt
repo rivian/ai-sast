@@ -12,11 +12,12 @@ grpcio>=1.54.0
 grpcio-status>=1.54.0
 
 # Optional integrations (install if needed)
-# Jira integration
-jira>=3.10.5
+# Jira integration (optional)
+# jira>=3.10.5
 
-# Databricks feedback loop
-databricks-sql-connector>=2.9.0
+# Databricks feedback loop (optional - use for enterprise deployments)
+# For local/small teams, SQLite is used by default (no installation needed)
+# databricks-sql-connector>=2.9.0
 
 # Development and testing
 pytest>=7.0.0

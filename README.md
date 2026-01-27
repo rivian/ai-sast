@@ -15,7 +15,8 @@ AI-SAST is a powerful, AI-driven static application security testing tool that u
 - 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more
 - 🎯 **Smart Filtering**: Configurable exclusion patterns to focus on relevant code
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
-- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support (see [INTEGRATIONS.md](INTEGRATIONS.md))
+- 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
+- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments (see [INTEGRATIONS.md](INTEGRATIONS.md))
 
 ## 🏛️ Architecture
 
@@ -30,9 +31,9 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 1. **GitHub Integration**: Pull requests trigger automated scans via GitHub Actions
 2. **AI-Powered Analysis**: Code is analyzed by Google Vertex AI (Gemini) for security vulnerabilities
 3. **Context-Aware Scanning**: 
-   - Historical vulnerability data provides context to improve accuracy
-   - Jira tickets can be queried to understand known vulnerability patterns
-   - Databricks stores feedback to reduce false positives
+   - **Local Database**: Scan results and feedback stored in SQLite for continuous learning
+   - Jira integration for known vulnerability patterns (optional)
+   - Databricks for enterprise multi-team deployments (optional)
 4. **Smart Scanning Modes**:
    - **PR Diff Scanning**: Fast, targeted scanning of only changed files
    - **Full Repository Scanning**: Comprehensive scan of entire codebase on main branch
@@ -42,10 +43,10 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
    - Webhook notifications (Slack, Teams, Discord, generic)
    - Metrics and trends for security posture tracking
 6. **Feedback Loop**:
-   - Interactive checkboxes in PR comments for marking true/false positives
-   - GitHub webhook listener captures developer feedback (see [webhook/README.md](webhook/README.md))
-   - Automatic storage in Databricks for historical analysis
-   - Continuous learning reduces false positives over time
+   - Interactive checkboxes in PR comments
+   - Automatic storage in local SQLite database
+   - Databricks option for enterprise deployments
+   - Reduces false positives over time
 
 📖 **For detailed architecture documentation**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -162,9 +163,11 @@ The project includes a GitHub Actions workflow for automated scanning. To use it
 
 ### Setting Up Developer Feedback Collection (Optional)
 
-To enable the feedback loop where developers can mark findings as true/false positives:
+By default, feedback is automatically stored in SQLite at `~/.ai-sast/scans.db`. 
 
-1. **Deploy the webhook listener** using the provided Terraform infrastructure:
+For enterprise deployments with webhook integration:
+
+1. **Deploy webhook listener** (optional):
    ```bash
    cd webhook/iac
    terraform init
@@ -172,13 +175,11 @@ To enable the feedback loop where developers can mark findings as true/false pos
    ```
 
 2. **Configure GitHub webhook**:
-   - Go to Settings → Webhooks → Add webhook
    - Payload URL: `https://your-webhook-url.com/webhook`
    - Content type: `application/json`
-   - Secret: Your webhook secret from AWS Secrets Manager
    - Events: Issue comments
    
-3. **Configure Databricks** for storing feedback (see [INTEGRATIONS.md](INTEGRATIONS.md))
+3. **(Optional) Use Databricks** for centralized storage (see [INTEGRATIONS.md](INTEGRATIONS.md))
 
 📚 **For detailed webhook setup instructions**, see [webhook/README.md](webhook/README.md)
 
@@ -197,8 +198,9 @@ To enable the feedback loop where developers can mark findings as true/false pos
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | (see below) |
 | `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | (optional) |
 | `AI_SAST_SEVERITY` | Comma-separated severities for PR comments | `critical,high` |
+| `AI_SAST_DB_PATH` | Path to SQLite database | `~/.ai-sast/scans.db` |
 
-📚 **For optional Jira, Databricks, and Vector integrations**, see **[INTEGRATIONS.md](INTEGRATIONS.md)**
+📚 **For optional integrations**, see **[INTEGRATIONS.md](INTEGRATIONS.md)**
 
 ### Default Exclusions
 
