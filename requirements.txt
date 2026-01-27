@@ -1,0 +1,24 @@
+# Google Cloud and Vertex AI dependencies
+google-cloud-aiplatform>=1.25.0
+google-cloud-core>=2.3.3
+google-auth>=2.17.3
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+
+# Additional utilities
+protobuf>=4.21.0,<5.0.0
+requests>=2.31.0
+grpcio>=1.54.0
+grpcio-status>=1.54.0
+
+# Optional integrations (install if needed)
+# Jira integration (optional)
+# jira>=3.10.5
+
+# Databricks feedback loop (optional - use for enterprise deployments)
+# For local/small teams, SQLite is used by default (no installation needed)
+# databricks-sql-connector>=2.9.0
+
+# Development and testing
+pytest>=7.0.0
+
