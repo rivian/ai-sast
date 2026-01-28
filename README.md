@@ -193,6 +193,7 @@ For enterprise deployments with webhook integration:
 | `GOOGLE_PROJECT_ID` | Alternative to GOOGLE_CLOUD_PROJECT | (required) |
 | `VERTEX_AI_LOCATION` | Vertex AI location/region | `us-central1` |
 | `GOOGLE_LOCATION` | Alternative to VERTEX_AI_LOCATION | `us-central1` |
+| `GEMINI_MODEL` | Gemini model to use | `gemini-2.0-flash-exp` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key | (optional) |
 | `GOOGLE_TOKEN` | Google Cloud token (JSON or base64) | (optional) |
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | (see below) |
@@ -282,6 +283,10 @@ export GOOGLE_CLOUD_PROJECT="my-company-production"
 export VERTEX_AI_LOCATION="us-central1"
 # Other options: "us-east1", "europe-west1", "asia-southeast1"
 
+# GEMINI_MODEL (Optional, default: gemini-2.0-flash-exp)
+export GEMINI_MODEL="gemini-2.0-flash-exp"
+# Other options: "gemini-1.5-pro", "gemini-2.5-pro" (requires higher quota)
+
 # GOOGLE_APPLICATION_CREDENTIALS (Optional)
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
@@ -314,6 +319,7 @@ Create a `.env` file:
 # === Core Configuration (Required) ===
 GOOGLE_CLOUD_PROJECT=
 VERTEX_AI_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.0-flash-exp
 
 # === Scanning Configuration (Optional) ===
 AI_SAST_EXCLUDE_PATHS=
@@ -444,7 +450,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ### Model Not Available (404 Error)
 - AI-SAST uses `gemini-2.0-flash-exp` model by default
-- Ensure your project has access to this model
+- You can change it with: `export GEMINI_MODEL="gemini-1.5-pro"`
+- Ensure your project has access to the model
 - Contact Google Cloud support if needed
 
 ### API Not Enabled

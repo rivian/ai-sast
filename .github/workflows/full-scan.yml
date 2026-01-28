@@ -16,6 +16,7 @@ jobs:
       GOOGLE_LOCATION: us-central1
       GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
       VERTEX_AI_LOCATION: us-central1
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
     
     steps:
       - name: Checkout code

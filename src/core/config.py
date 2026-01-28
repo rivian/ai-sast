@@ -12,8 +12,13 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GOOGLE_PROJECT_ID",
 # Example: "us-central1", "us-east1", "europe-west1", "asia-southeast1"
 LOCATION = os.getenv("VERTEX_AI_LOCATION") or os.getenv("GOOGLE_LOCATION", "us-central1")
 
+# GEMINI_MODEL: Gemini model to use for security analysis
+# Example: "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-2.5-pro"
+# Default: "gemini-2.0-flash-exp" (fast, low-cost, good for most scans)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+
 DEFAULT_TEXT_MODEL = "text-bison@001"
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
+DEFAULT_GEMINI_MODEL = GEMINI_MODEL  # For backward compatibility
 DEFAULT_EMBEDDING_MODEL = "textembedding-gecko@001"
 
 DEFAULT_MAX_OUTPUT_TOKENS = 1024

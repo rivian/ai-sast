@@ -20,7 +20,7 @@ import time
 import logging
 
 from .vertex import VertexAIClient
-from .config import PROJECT_ID, LOCATION
+from .config import PROJECT_ID, LOCATION, GEMINI_MODEL
 
 # Optional integrations - import only if available
 try:
@@ -118,7 +118,7 @@ Format your response for each finding as:
             project_id or PROJECT_ID,
             location or LOCATION
         )
-        print(f"🤖 Using Gemini 2.0 Flash model for security analysis")
+        print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
         
         # CI_PROJECT_URL (GitLab) or GITHUB_REPOSITORY (GitHub): Repository identifier
         # Example GitLab: "https://gitlab.com/myorg/myproject"
@@ -311,8 +311,8 @@ Format your response for each finding as:
         
         for attempt in range(max_retries):
             try:
-                # Use Gemini 2.0 Flash model
-                analysis = self.client.generate_with_gemini(prompt, model_name="gemini-2.0-flash-exp")
+                # Use configured Gemini model (from GEMINI_MODEL env var)
+                analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
                 
                 return {
                     "file_path": file_path,

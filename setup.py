@@ -112,7 +112,7 @@ VERTEX_AI_LOCATION={location}
 
 # Optional: Custom model configurations
 # VERTEX_AI_TEXT_MODEL=text-bison@001
-# VERTEX_AI_GEMINI_MODEL=gemini-2.0-flash-exp
+# GEMINI_MODEL=gemini-2.0-flash-exp
 # VERTEX_AI_EMBEDDING_MODEL=textembedding-gecko@001
 """
     
