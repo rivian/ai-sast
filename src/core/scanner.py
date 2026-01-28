@@ -42,11 +42,34 @@ class SecurityScanner:
     """
     Security vulnerability scanner using Vertex AI
     """
-    
-    DEFAULT_FILE_PATTERNS = [
-        '*.py', '*.js', '*.ts', '*.java', '*.cpp', '*.c', '*.h',
-        '*.php', '*.rb', '*.go', '*.rs', '*.cs', '*.sql', '*.sh', '*.graphql'
-    ]
+
+    @staticmethod
+    def _load_file_extensions() -> List[str]:
+        """Load file extensions from ai-sast-extensions.txt file"""
+        try:
+            # Get the project root directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            extensions_file = os.path.join(project_root, 'ai-sast-extensions.txt')
+            
+            if os.path.exists(extensions_file):
+                with open(extensions_file, 'r') as f:
+                    patterns = []
+                    for line in f:
+                        line = line.strip()
+                        # Skip comments and empty lines
+                        if line and not line.startswith('#'):
+                            patterns.append(line)
+                    if patterns:
+                        return patterns
+        except Exception as e:
+            logging.warning(f"Could not load file extensions from ai-sast-extensions.txt: {e}")
+        
+        # Fallback patterns if file doesn't exist or has issues
+        return [
+            '*.py', '*.js', '*.ts', '*.java', '*.cpp', '*.c', '*.h',
+            '*.php', '*.rb', '*.go', '*.rs', '*.cs', '*.sql', '*.sh', '*.graphql'
+        ]
 
     @staticmethod
     def _load_default_prompt() -> str:
@@ -381,7 +404,7 @@ Format your response for each finding as:
         """
         
         if file_patterns is None:
-            file_patterns = self.DEFAULT_FILE_PATTERNS
+            file_patterns = self._load_file_extensions()
         
         # --- Exclusion Logic ---
         # AI_SAST_EXCLUDE_PATHS: Comma-separated paths to exclude from scanning (optional)
@@ -594,7 +617,7 @@ Format your response for each finding as:
             List of file paths
         """
         if file_patterns is None:
-            file_patterns = self.DEFAULT_FILE_PATTERNS
+            file_patterns = self._load_file_extensions()
         
         # Exclusion logic
         default_exclude_keywords = ['test', 'node_modules', '.git']

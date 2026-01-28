@@ -12,7 +12,7 @@ AI-SAST is a powerful, AI-driven static application security testing tool that u
 - 💬 **Detailed Reports**: Generates comprehensive HTML and text reports
 - 🔄 **GitHub Actions Integration**: Automated scanning in GitHub CI/CD workflows
 - ⚙️ **Configurable**: Easy to configure through environment variables
-- 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more
+- 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more (see `ai-sast-extensions.txt`)
 - 🎯 **Smart Filtering**: Configurable exclusion patterns to focus on relevant code
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
 - 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
@@ -239,6 +239,34 @@ export AI_SAST_CUSTOM_PROMPT="Only report issues with direct exploit paths"
 
 # Domain-specific guidance  
 export AI_SAST_CUSTOM_PROMPT="Pay special attention to payment processing and PII handling"
+```
+
+### Supported File Extensions
+
+AI-SAST scans specific file types for security vulnerabilities. The supported extensions are defined in `ai-sast-extensions.txt` file in the project root.
+
+**Default supported languages:**
+- Python (`.py`)
+- JavaScript/TypeScript (`.js`, `.ts`, `.jsx`, `.tsx`)
+- Java (`.java`)
+- C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)
+- PHP (`.php`)
+- Ruby (`.rb`)
+- Go (`.go`)
+- Rust (`.rs`)
+- C# (`.cs`)
+- SQL (`.sql`)
+- Shell (`.sh`, `.bash`)
+- GraphQL (`.graphql`, `.gql`)
+
+**To customize:**
+Edit `ai-sast-extensions.txt` to add or remove file types:
+```bash
+# Add Swift files
+echo "*.swift" >> ai-sast-extensions.txt
+
+# Remove PHP files (comment out the line)
+sed -i 's/^\*.php$/# *.php/' ai-sast-extensions.txt
 ```
 
 ### Complete Environment Variable Reference

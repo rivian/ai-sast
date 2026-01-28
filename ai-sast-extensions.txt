@@ -1,0 +1,58 @@
+# AI-SAST Supported File Extensions
+#
+# This file defines which file types are scanned for security vulnerabilities.
+# Add or remove extensions as needed for your project.
+
+# Python
+*.py
+
+# JavaScript/TypeScript
+*.js
+*.ts
+*.jsx
+*.tsx
+
+# Java
+*.java
+
+# C/C++
+*.cpp
+*.c
+*.h
+*.hpp
+
+# PHP
+*.php
+
+# Ruby
+*.rb
+
+# Go
+*.go
+
+# Rust
+*.rs
+
+# C#
+*.cs
+
+# SQL
+*.sql
+
+# Shell scripts
+*.sh
+*.bash
+
+# GraphQL
+*.graphql
+*.gql
+
+# Additional languages
+*.swift
+*.kt
+*.kts
+*.scala
+*.lua
+*.pl
+*.r
+*.R
