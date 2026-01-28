@@ -333,7 +333,7 @@ export LLM_BACKEND="ollama"
 4. **SSD**: Store models on SSD for faster loading
 5. **Keep models updated**: Run `ollama pull <model>` periodically
 
-📚 **For detailed comparison**, see [docs/OLLAMA_VS_VERTEX.md](docs/OLLAMA_VS_VERTEX.md)
+📚 **For detailed configuration**, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 
 ---
 
@@ -596,8 +596,39 @@ export AI_SAST_CUSTOM_PROMPT="Focus on SQL injection and XSS vulnerabilities"
 export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs,*.min.js"
 
 # AI_SAST_SEVERITY (Optional, default: critical,high)
+# Controls which severity levels are posted as PR comments
 export AI_SAST_SEVERITY="critical,high"
-# Options: "critical", "high", "medium", "low" (any combination)
+# Options:
+#   - "critical,high" (default) - Only critical and high severity findings
+#   - "critical,high,medium" - Include medium severity findings
+#   - "critical,high,medium,low" - Include all findings except info
+#   - "critical" - Only critical findings
+# Note: Full scan reports always include all severities, this only affects PR comments
+```
+
+#### GitHub Actions Configuration
+
+**To customize PR comment severities in GitHub Actions:**
+
+1. Go to: **Repository Settings → Secrets and variables → Actions → Variables**
+2. Click **New repository variable**
+3. Set:
+   - **Name**: `AI_SAST_SEVERITY`
+   - **Value**: `critical,high,medium` (or your preferred severities)
+
+**Examples:**
+```bash
+# Show only critical issues (very strict)
+AI_SAST_SEVERITY=critical
+
+# Show critical and high (default, recommended)
+AI_SAST_SEVERITY=critical,high
+
+# Show critical, high, and medium (more verbose)
+AI_SAST_SEVERITY=critical,high,medium
+
+# Show everything except info (very verbose)
+AI_SAST_SEVERITY=critical,high,medium,low
 ```
 
 #### Environment File Template
