@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   full-scan:
-    name: Security Full Repository Scan
+    name: AI SAST Full Repository Scan
     runs-on: ubuntu-latest
     continue-on-error: true
     
