@@ -201,6 +201,9 @@ class HTMLReportGenerator:
                 location_raw = vuln.get('location', 'N/A')
                 issue_raw = vuln.get('issue', 'N/A')
                 line_num = self._parse_line_number(location_raw)
+                
+                # Generate unique ID for this finding
+                vuln_id = self._generate_vuln_id(file_path_raw, issue_raw, location_raw)
 
                 link = self._create_hyperlink(repo_url, ref_name, file_path_raw, line_num)
                 
@@ -214,9 +217,13 @@ class HTMLReportGenerator:
 
                 md_parts.append("\n---\n")
                 
+                # Add unique ID (hidden comment for tracking)
+                md_parts.append(f"<!-- vuln-id: {vuln_id} -->\n")
+                
                 # Add interactive feedback checkboxes
                 md_parts.append(f"- [ ] ✅ True Positive  [ ] ❌ False Positive\n")
                 
+                md_parts.append(f"**ID**: `{vuln_id}`")
                 md_parts.append(f"**Severity**: {severity}")
                 md_parts.append(f"**Issue**: {issue}")
                 md_parts.append(f"**Location**: {file_display}")

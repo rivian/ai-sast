@@ -320,9 +320,22 @@ def webhook():
         if not (is_true_positive or is_false_positive):
             continue
         
-        # Extract vulnerability details from this section
-        # This section should contain the vulnerability info
-        vuln_id = f"{pr_url}-{hash(section) % 100000000:08x}"  # Generate consistent ID
+        # Extract vulnerability ID from hidden comment or ID field
+        vuln_id = None
+        
+        # Try to extract from HTML comment first (<!-- vuln-id: abc123 -->)
+        id_comment_match = re.search(r'<!--\s*vuln-id:\s*([a-f0-9]+)\s*-->', section)
+        if id_comment_match:
+            vuln_id = id_comment_match.group(1)
+        else:
+            # Try to extract from visible ID field (**ID**: `abc123`)
+            id_field_match = re.search(r'\*\*ID\*\*:\s*`([a-f0-9]+)`', section)
+            if id_field_match:
+                vuln_id = id_field_match.group(1)
+            else:
+                # Fallback: generate from section hash (for backwards compatibility)
+                vuln_id = f"legacy-{hash(section) % 100000000:08x}"
+                logger.warning(f"⚠️ No vuln_id found in section, using fallback: {vuln_id}")
         
         status = 'true_positive' if is_true_positive else 'false_positive'
         
