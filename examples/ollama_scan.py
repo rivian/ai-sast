@@ -32,25 +32,34 @@ def main():
     print("=" * 70)
     print()
     
-    # Example vulnerable code to scan
+    # Example code to scan - demonstrating secure practices
     code_sample = """
 import sqlite3
+import os
 
 def get_user(username):
+    '''Secure database query using parameterized statements'''
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
     
-    # SQL Injection vulnerability
-    query = f"SELECT * FROM users WHERE username = '{username}'"
-    cursor.execute(query)
+    # Use parameterized query to prevent SQL injection
+    query = "SELECT * FROM users WHERE username = ?"
+    cursor.execute(query, (username,))
     
     result = cursor.fetchone()
     conn.close()
     return result
 
 def process_file(filepath):
-    # Path traversal vulnerability
-    with open(filepath, 'r') as f:
+    '''Read file with path validation to prevent path traversal'''
+    # Validate filepath is within allowed directory
+    base_dir = os.path.abspath('/allowed/directory')
+    abs_path = os.path.abspath(filepath)
+    
+    if not abs_path.startswith(base_dir):
+        raise ValueError("Invalid file path")
+    
+    with open(abs_path, 'r') as f:
         return f.read()
 """
     
