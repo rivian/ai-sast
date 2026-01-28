@@ -193,7 +193,7 @@ def main():
     
     # Initialize scanner
     scanner = SecurityScanner(repo_url=repo_url)
-    file_patterns = SecurityScanner.DEFAULT_FILE_PATTERNS
+    file_patterns = scanner._load_file_extensions()
 
     print("\nScanning changed files...")
     for change in changes:
