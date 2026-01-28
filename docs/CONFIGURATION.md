@@ -64,14 +64,17 @@ export AI_SAST_SEVERITY="critical,high,medium,low"
 
 Every finding includes:
 - **Unique ID** (`a7b3c9f2`) for tracking
-- **Checkboxes** for feedback: `- [ ] ✅ True Positive  [ ] ❌ False Positive`
+- **Checkboxes** for feedback:
+  - `- [ ] ✅ True Positive`
+  - `- [ ] ❌ False Positive`
 - **Severity, Issue, Location** with clickable links
 - **CVSS Vector** and remediation details
 
 Example:
 ```markdown
 <!-- vuln-id: a7b3c9f2 -->
-- [ ] ✅ True Positive  [ ] ❌ False Positive
+- [ ] ✅ True Positive
+- [ ] ❌ False Positive
 
 **ID**: `a7b3c9f2`
 **Severity**: Critical

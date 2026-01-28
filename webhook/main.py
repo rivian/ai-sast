@@ -286,9 +286,11 @@ def webhook():
     if '🤖 AI-SAST Security Scan' not in comment_body:
         return "Not an AI-SAST comment", 200
     
-    # Extract checkbox patterns
-    # Looking for: - [x] ✅ True Positive  [ ] ❌ False Positive
-    checkbox_pattern = re.compile(r'- \[([ x])\] ✅ True Positive\s+\[([ x])\] ❌ False Positive')
+    # Extract checkbox patterns (each on separate line)
+    # Looking for:
+    # - [x] ✅ True Positive
+    # - [ ] ❌ False Positive
+    checkbox_pattern = re.compile(r'- \[([ x])\] ✅ True Positive')
     
     if not checkbox_pattern.search(comment_body):
         return "No feedback checkboxes found", 200
@@ -304,9 +306,9 @@ def webhook():
     # Get timestamp
     updated_timestamp = payload.get('comment', {}).get('updated_at', '')
     
-    # Find all checked boxes
-    checked_pattern = re.compile(r'- \[x\] ✅ True Positive\s+\[ \] ❌ False Positive')
-    false_positive_pattern = re.compile(r'- \[ \] ✅ True Positive\s+\[x\] ❌ False Positive')
+    # Find all checked boxes (on separate lines)
+    checked_pattern = re.compile(r'- \[x\] ✅ True Positive')
+    false_positive_pattern = re.compile(r'- \[x\] ❌ False Positive')
     
     # Split comment into sections and process each vulnerability
     sections = comment_body.split('---')

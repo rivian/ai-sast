@@ -220,8 +220,9 @@ class HTMLReportGenerator:
                 # Add unique ID (hidden comment for tracking)
                 md_parts.append(f"<!-- vuln-id: {vuln_id} -->\n")
                 
-                # Add interactive feedback checkboxes
-                md_parts.append(f"- [ ] ✅ True Positive  [ ] ❌ False Positive\n")
+                # Add interactive feedback checkboxes (each on separate line)
+                md_parts.append(f"- [ ] ✅ True Positive\n")
+                md_parts.append(f"- [ ] ❌ False Positive\n")
                 
                 md_parts.append(f"**ID**: `{vuln_id}`")
                 md_parts.append(f"**Severity**: {severity}")
