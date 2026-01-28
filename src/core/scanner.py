@@ -307,7 +307,7 @@ Format your response for each finding as:
         )
         
         max_retries = 5
-        backoff_factor = 2
+        backoff_factor = 3  # Increased from 2 to 3 for longer waits
         
         for attempt in range(max_retries):
             try:
@@ -325,7 +325,7 @@ Format your response for each finding as:
                 # Check for rate limit error (429)
                 if "429" in error_message and "Resource exhausted" in error_message:
                     if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
+                        wait_time = backoff_factor ** (attempt + 1)  # Exponential: 3, 9, 27, 81 seconds
                         print(f"⚠️ Rate limit hit for {file_path}. Retrying in {wait_time}s... (Attempt {attempt + 1}/{max_retries})")
                         time.sleep(wait_time)
                         continue
@@ -470,6 +470,10 @@ Format your response for each finding as:
                     # Override the absolute path with the correct relative path for reporting
                     result['file_path'] = rel_path
                     scan_results.append(result)
+                    
+                    # Add delay to avoid rate limits when processing results
+                    if max_workers > 1:
+                        time.sleep(1)
                 except Exception as e:
                     print(f"Error scanning file {rel_path}: {e}")
                     scan_results.append({

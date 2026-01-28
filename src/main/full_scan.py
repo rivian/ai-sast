@@ -25,6 +25,7 @@ def main():
     parser = argparse.ArgumentParser(description="Full repository security scan")
     parser.add_argument("--directory", type=str, default=".", help="Directory to scan (default: current)")
     parser.add_argument("--output-prefix", type=str, default="ai_sast_full_scan", help="Output file prefix")
+    parser.add_argument("--max-workers", type=int, default=10, help="Max parallel workers (default: 10, set to 1 to avoid rate limits)")
     args = parser.parse_args()
     
     # Get repository information from environment or arguments
@@ -58,7 +59,7 @@ def main():
         
         print(f"Scanning directory: {scan_dir}")
         print("Applying default and custom exclusion rules from AI_SAST_EXCLUDE_PATHS...")
-        results = scanner.scan_directory(scan_dir)
+        results = scanner.scan_directory(scan_dir, max_workers=args.max_workers)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         

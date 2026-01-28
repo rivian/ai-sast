@@ -40,7 +40,7 @@ jobs:
       - name: Run AI-SAST Full Scan
         run: |
           echo "Running AI-SAST full repository scan"
-          python -m src.main.full_scan
+          python -m src.main.full_scan --max-workers 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
