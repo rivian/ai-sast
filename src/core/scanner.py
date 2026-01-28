@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Security vulnerability scanner using Vertex AI
+Security vulnerability scanner using AI (Vertex AI or Ollama)
 
 This module provides functionality to scan source code for security vulnerabilities
-using Google Cloud Vertex AI models.
+using either Google Cloud Vertex AI or local Ollama models.
 """
 
 import sys
@@ -19,8 +19,19 @@ import shutil
 import time
 import logging
 
-from .vertex import VertexAIClient
-from .config import PROJECT_ID, LOCATION, GEMINI_MODEL
+from .config import (
+    LLM_BACKEND, 
+    PROJECT_ID, LOCATION, GEMINI_MODEL,
+    OLLAMA_BASE_URL, OLLAMA_MODEL
+)
+
+# Import LLM clients based on backend
+if LLM_BACKEND == "ollama":
+    from ..integrations.ollama import OllamaClient
+    VertexAIClient = None
+else:
+    from .vertex import VertexAIClient
+    OllamaClient = None
 
 # Optional integrations - import only if available
 try:
@@ -110,15 +121,26 @@ Format your response for each finding as:
         Initialize the security scanner
         
         Args:
-            project_id: Google Cloud Project ID
-            location: GCP region
+            project_id: Google Cloud Project ID (only for Vertex AI backend)
+            location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
-        self.client = VertexAIClient(
-            project_id or PROJECT_ID,
-            location or LOCATION
-        )
-        print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
+        # Initialize LLM client based on backend
+        if LLM_BACKEND == "ollama":
+            print(f"🔧 LLM Backend: Ollama (local)")
+            self.client = OllamaClient(
+                base_url=OLLAMA_BASE_URL,
+                model=OLLAMA_MODEL
+            )
+            self.backend = "ollama"
+        else:
+            print(f"🔧 LLM Backend: Vertex AI (Google Cloud)")
+            self.client = VertexAIClient(
+                project_id or PROJECT_ID,
+                location or LOCATION
+            )
+            print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
+            self.backend = "vertex"
         
         # CI_PROJECT_URL (GitLab) or GITHUB_REPOSITORY (GitHub): Repository identifier
         # Example GitLab: "https://gitlab.com/myorg/myproject"
@@ -311,8 +333,12 @@ Format your response for each finding as:
         
         for attempt in range(max_retries):
             try:
-                # Use configured Gemini model (from GEMINI_MODEL env var)
-                analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
+                # Call LLM based on backend
+                if self.backend == "ollama":
+                    analysis = self.client.generate(prompt, temperature=0.2)
+                else:
+                    # Vertex AI backend
+                    analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
                 
                 return {
                     "file_path": file_path,
@@ -322,7 +348,7 @@ Format your response for each finding as:
                 }
             except Exception as e:
                 error_message = str(e)
-                # Check for rate limit error (429)
+                # Check for rate limit error (429) - Vertex AI specific
                 if "429" in error_message and "Resource exhausted" in error_message:
                     if attempt < max_retries - 1:
                         wait_time = backoff_factor ** (attempt + 1)  # Exponential: 3, 9, 27, 81 seconds
