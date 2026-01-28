@@ -4,18 +4,21 @@
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub Actions](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=github-actions)](https://github.com/features/actions)
 
-AI-SAST is a powerful, AI-driven static application security testing tool that uses Google Cloud Vertex AI (Gemini models) to scan source code for security vulnerabilities. It provides intelligent, context-aware security analysis with detailed reports.
+AI-SAST is a powerful, AI-driven static application security testing tool that supports **both cloud-based (Google Vertex AI)** and **local open-source (Ollama)** LLM backends. It provides intelligent, context-aware security analysis with detailed reports.
 
 ## ✨ Features
 
-- 🤖 **AI-Powered Scanning**: Uses Google Cloud Vertex AI's Gemini models to analyze code for vulnerabilities
+- 🤖 **Flexible LLM Backends**: 
+  - **Vertex AI** (Google Cloud Gemini models) - Production-grade, cloud-based
+  - **Ollama** (Local open-source models) - Privacy-first, runs on your machine
 - 💬 **Detailed Reports**: Generates comprehensive HTML and text reports
 - 🔄 **GitHub Actions Integration**: Automated scanning in GitHub CI/CD workflows
 - ⚙️ **Configurable**: Easy to configure through environment variables
-- 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more
+- 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more (see `ai-sast-extensions.txt`)
 - 🎯 **Smart Filtering**: Configurable exclusion patterns to focus on relevant code
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
 - 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
+- 🔒 **Privacy Options**: Keep your code on-premise with Ollama backend
 - 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments (see [INTEGRATIONS.md](INTEGRATIONS.md))
 
 ## 🏛️ Architecture
@@ -51,6 +54,288 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 📖 **For detailed architecture documentation**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 🚀 Quick Start
+
+### Choose Your LLM Backend
+
+AI-SAST supports two backends:
+
+| Backend | Best For | Setup |
+|---------|----------|-------|
+| **Vertex AI** | Production, cloud, teams | Requires Google Cloud account |
+| **Ollama** | Local, privacy, cost-free | Runs on your machine |
+
+<details>
+<summary><b>Option 1: Vertex AI (Cloud)</b></summary>
+
+#### Prerequisites
+- Python 3.8 or higher
+- Google Cloud Platform account with Vertex AI API enabled
+- Google Cloud CLI (optional, for easier authentication)
+
+#### Setup
+```bash
+# Install dependencies
+python setup.py
+
+# Configure
+export LLM_BACKEND="vertex"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export VERTEX_AI_LOCATION="us-central1"
+export GEMINI_MODEL="gemini-2.0-flash-exp"  # or gemini-2.5-pro
+```
+
+See full Vertex AI setup below.
+</details>
+
+<details>
+<summary><b>Option 2: Ollama (Local/Open-Source) ⭐ New!</b></summary>
+
+#### Prerequisites
+- Python 3.8 or higher
+- [Ollama](https://ollama.com/) installed locally
+
+#### Setup
+```bash
+# Install Ollama (Mac/Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a code model
+ollama pull qwen2.5-coder:14b
+
+# Start Ollama (if not auto-started)
+ollama serve
+
+# Install AI-SAST dependencies
+pip install -r requirements.txt
+
+# Configure
+export LLM_BACKEND="ollama"
+export OLLAMA_MODEL="qwen2.5-coder:14b"
+export OLLAMA_BASE_URL="http://localhost:11434"
+
+# Run example
+python examples/ollama_scan.py
+```
+
+**Recommended Models for Security Scanning:**
+- `qwen2.5-coder:14b` - **Recommended** - Best balance (8GB RAM)
+- `qwen2.5-coder:7b` - Fast, code-focused (4GB RAM)
+- `qwen2.5-coder:32b` - Most accurate (20GB RAM)
+- `codellama:13b` - Meta's code model (8GB RAM)
+- `llama3.1:8b` - Latest Llama (5GB RAM)
+- `deepseek-coder:33b` - Alternative, very capable (20GB RAM)
+
+**Benefits:**
+- ✅ 100% free and open-source
+- ✅ Your code never leaves your machine
+- ✅ No cloud costs or rate limits
+- ✅ Works offline
+
+</details>
+
+---
+
+## 🖥️ Running Ollama Locally (Open-Source Alternative)
+
+### System Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| **OS** | macOS, Linux, Windows (WSL2) | macOS or Linux |
+| **RAM** | 8GB (for 7B models) | 16GB+ (for 14B models) |
+| **Disk Space** | 5GB free | 20GB+ free |
+| **CPU** | Any modern CPU | Multi-core CPU |
+| **GPU** | Not required | NVIDIA/AMD GPU (10x faster) |
+
+### Installation Steps
+
+#### 1. Install Ollama
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+**Windows:**
+Download from [https://ollama.com/download/windows](https://ollama.com/download/windows)
+
+**Verify Installation:**
+```bash
+ollama --version
+```
+
+#### 2. Start Ollama Service
+
+**macOS:**
+Ollama starts automatically after installation.
+
+**Linux:**
+```bash
+# Start service
+ollama serve
+
+# Or run in background
+nohup ollama serve &
+```
+
+**Check if running:**
+```bash
+curl http://localhost:11434/api/tags
+```
+
+#### 3. Pull a Model
+
+**Recommended for most users:**
+```bash
+ollama pull qwen2.5-coder:14b
+```
+
+**Other options:**
+```bash
+# Faster, smaller model (4GB RAM)
+ollama pull qwen2.5-coder:7b
+
+# Most accurate (20GB RAM)
+ollama pull qwen2.5-coder:32b
+
+# Alternatives
+ollama pull codellama:13b
+ollama pull llama3.1:8b
+```
+
+**List installed models:**
+```bash
+ollama list
+```
+
+#### 4. Install AI-SAST
+
+```bash
+# Clone repository
+git clone https://github.com/YOUR_USERNAME/ai-sast.git
+cd ai-sast
+
+# Install Python dependencies
+pip install -r requirements.txt
+```
+
+#### 5. Configure AI-SAST for Ollama
+
+```bash
+# Set backend to Ollama
+export LLM_BACKEND="ollama"
+
+# Optional: Change model (defaults to qwen2.5-coder:14b)
+export OLLAMA_MODEL="qwen2.5-coder:14b"
+
+# Optional: Change Ollama URL (defaults to http://localhost:11434)
+export OLLAMA_BASE_URL="http://localhost:11434"
+```
+
+#### 6. Run Your First Scan
+
+```bash
+# Test with example
+python examples/ollama_scan.py
+
+# Scan a file
+python -m src.core.scanner --file your_file.py
+
+# Scan a directory
+python -m src.core.scanner --directory ./your-code
+```
+
+### Quick Start (All-in-One)
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull model
+ollama pull qwen2.5-coder:14b
+
+# Verify
+ollama list
+
+# Configure
+export LLM_BACKEND="ollama"
+
+# Run example
+cd ai-sast
+python examples/ollama_scan.py
+```
+
+### Troubleshooting
+
+**"Connection refused":**
+```bash
+# Make sure Ollama is running
+ollama serve
+
+# Or check status
+curl http://localhost:11434/api/tags
+```
+
+**"Model not found":**
+```bash
+# List available models
+ollama list
+
+# Pull the model you want
+ollama pull qwen2.5-coder:14b
+```
+
+**"Out of memory":**
+```bash
+# Use a smaller model
+ollama pull qwen2.5-coder:7b
+export OLLAMA_MODEL="qwen2.5-coder:7b"
+```
+
+**Slow performance:**
+```bash
+# Check if GPU is being used
+ollama ps
+
+# For NVIDIA GPUs, install CUDA drivers
+# For AMD GPUs, install ROCm drivers
+```
+
+### Model Selection Guide
+
+| Model | RAM | Speed | Accuracy | Best For |
+|-------|-----|-------|----------|----------|
+| `qwen2.5-coder:7b` | 4GB | Fast | ⭐⭐⭐⭐ | Quick scans, limited RAM |
+| `qwen2.5-coder:14b` | 8GB | Medium | ⭐⭐⭐⭐⭐ | **Recommended default** |
+| `qwen2.5-coder:32b` | 20GB | Slow | ⭐⭐⭐⭐⭐ | Maximum accuracy |
+| `codellama:13b` | 8GB | Medium | ⭐⭐⭐⭐ | Alternative option |
+| `llama3.1:8b` | 5GB | Medium | ⭐⭐⭐⭐ | General purpose |
+
+### Switching Between Vertex AI and Ollama
+
+**Use Vertex AI:**
+```bash
+unset LLM_BACKEND  # Uses default (vertex)
+# or
+export LLM_BACKEND="vertex"
+```
+
+**Use Ollama:**
+```bash
+export LLM_BACKEND="ollama"
+```
+
+### Performance Tips
+
+1. **Use GPU**: Install NVIDIA CUDA or AMD ROCm for 5-10x speedup
+2. **Smaller models**: Use `qwen2.5-coder:7b` for faster scans
+3. **More RAM**: Close other applications to free memory
+4. **SSD**: Store models on SSD for faster loading
+5. **Keep models updated**: Run `ollama pull <model>` periodically
+
+📚 **For detailed configuration**, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+
+---
 
 ### Prerequisites
 
@@ -189,12 +474,20 @@ For enterprise deployments with webhook integration:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | (required) |
-| `GOOGLE_PROJECT_ID` | Alternative to GOOGLE_CLOUD_PROJECT | (required) |
+| **LLM Backend** |
+| `LLM_BACKEND` | Backend to use: `vertex` or `ollama` | `vertex` |
+| **Vertex AI (Cloud)** |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | (required for vertex) |
+| `GOOGLE_PROJECT_ID` | Alternative to GOOGLE_CLOUD_PROJECT | (required for vertex) |
 | `VERTEX_AI_LOCATION` | Vertex AI location/region | `us-central1` |
 | `GOOGLE_LOCATION` | Alternative to VERTEX_AI_LOCATION | `us-central1` |
+| `GEMINI_MODEL` | Gemini model to use | `gemini-2.0-flash-exp` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key | (optional) |
 | `GOOGLE_TOKEN` | Google Cloud token (JSON or base64) | (optional) |
+| **Ollama (Local)** |
+| `OLLAMA_BASE_URL` | Ollama API endpoint | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Model to use with Ollama | `qwen2.5-coder:14b` |
+| **Scanning** |
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | (see below) |
 | `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | (optional) |
 | `AI_SAST_SEVERITY` | Comma-separated severities for PR comments | `critical,high` |
@@ -241,6 +534,34 @@ export AI_SAST_CUSTOM_PROMPT="Only report issues with direct exploit paths"
 export AI_SAST_CUSTOM_PROMPT="Pay special attention to payment processing and PII handling"
 ```
 
+### Supported File Extensions
+
+AI-SAST scans specific file types for security vulnerabilities. The supported extensions are defined in `ai-sast-extensions.txt` file in the project root.
+
+**Default supported languages:**
+- Python (`.py`)
+- JavaScript/TypeScript (`.js`, `.ts`, `.jsx`, `.tsx`)
+- Java (`.java`)
+- C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)
+- PHP (`.php`)
+- Ruby (`.rb`)
+- Go (`.go`)
+- Rust (`.rs`)
+- C# (`.cs`)
+- SQL (`.sql`)
+- Shell (`.sh`, `.bash`)
+- GraphQL (`.graphql`, `.gql`)
+
+**To customize:**
+Edit `ai-sast-extensions.txt` to add or remove file types:
+```bash
+# Add Swift files
+echo "*.swift" >> ai-sast-extensions.txt
+
+# Remove PHP files (comment out the line)
+sed -i 's/^\*.php$/# *.php/' ai-sast-extensions.txt
+```
+
 ### Complete Environment Variable Reference
 
 #### Core Configuration
@@ -253,6 +574,10 @@ export GOOGLE_CLOUD_PROJECT="my-company-production"
 # VERTEX_AI_LOCATION (Optional, default: us-central1)
 export VERTEX_AI_LOCATION="us-central1"
 # Other options: "us-east1", "europe-west1", "asia-southeast1"
+
+# GEMINI_MODEL (Optional, default: gemini-2.0-flash-exp)
+export GEMINI_MODEL="gemini-2.0-flash-exp"
+# Other options: "gemini-1.5-pro", "gemini-2.5-pro" (requires higher quota)
 
 # GOOGLE_APPLICATION_CREDENTIALS (Optional)
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
@@ -271,8 +596,39 @@ export AI_SAST_CUSTOM_PROMPT="Focus on SQL injection and XSS vulnerabilities"
 export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs,*.min.js"
 
 # AI_SAST_SEVERITY (Optional, default: critical,high)
+# Controls which severity levels are posted as PR comments
 export AI_SAST_SEVERITY="critical,high"
-# Options: "critical", "high", "medium", "low" (any combination)
+# Options:
+#   - "critical,high" (default) - Only critical and high severity findings
+#   - "critical,high,medium" - Include medium severity findings
+#   - "critical,high,medium,low" - Include all findings except info
+#   - "critical" - Only critical findings
+# Note: Full scan reports always include all severities, this only affects PR comments
+```
+
+#### GitHub Actions Configuration
+
+**To customize PR comment severities in GitHub Actions:**
+
+1. Go to: **Repository Settings → Secrets and variables → Actions → Variables**
+2. Click **New repository variable**
+3. Set:
+   - **Name**: `AI_SAST_SEVERITY`
+   - **Value**: `critical,high,medium` (or your preferred severities)
+
+**Examples:**
+```bash
+# Show only critical issues (very strict)
+AI_SAST_SEVERITY=critical
+
+# Show critical and high (default, recommended)
+AI_SAST_SEVERITY=critical,high
+
+# Show critical, high, and medium (more verbose)
+AI_SAST_SEVERITY=critical,high,medium
+
+# Show everything except info (very verbose)
+AI_SAST_SEVERITY=critical,high,medium,low
 ```
 
 #### Environment File Template
@@ -286,6 +642,7 @@ Create a `.env` file:
 # === Core Configuration (Required) ===
 GOOGLE_CLOUD_PROJECT=
 VERTEX_AI_LOCATION=us-central1
+GEMINI_MODEL=gemini-2.0-flash-exp
 
 # === Scanning Configuration (Optional) ===
 AI_SAST_EXCLUDE_PATHS=
@@ -416,7 +773,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ### Model Not Available (404 Error)
 - AI-SAST uses `gemini-2.0-flash-exp` model by default
-- Ensure your project has access to this model
+- You can change it with: `export GEMINI_MODEL="gemini-1.5-pro"`
+- Ensure your project has access to the model
 - Contact Google Cloud support if needed
 
 ### API Not Enabled

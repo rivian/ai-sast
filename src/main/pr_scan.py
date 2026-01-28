@@ -10,6 +10,7 @@ for security vulnerabilities, and can post results as a PR comment.
 import os
 import sys
 import json
+import time
 import fnmatch
 import hashlib
 from datetime import datetime
@@ -193,7 +194,7 @@ def main():
     
     # Initialize scanner
     scanner = SecurityScanner(repo_url=repo_url)
-    file_patterns = SecurityScanner.DEFAULT_FILE_PATTERNS
+    file_patterns = scanner._load_file_extensions()
 
     print("\nScanning changed files...")
     for change in changes:
@@ -220,6 +221,10 @@ def main():
             
             result = scanner.scan_code_content(added_code, file_path, language)
             scan_results.append(result)
+            
+            # Add delay between API calls to avoid rate limits
+            import time
+            time.sleep(2)
         else:
             print(f"ℹ️  No added lines to scan in: {file_path}")
 

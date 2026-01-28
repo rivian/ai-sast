@@ -1,0 +1,56 @@
+name: AI-SAST Full Scan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-scan:
+    name: AI SAST Full Repository Scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    env:
+      GOOGLE_LOCATION: us-central1
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      VERTEX_AI_LOCATION: us-central1
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+      
+      - name: Run AI-SAST Full Scan
+        run: |
+          echo "Running AI-SAST full repository scan"
+          python -m src.main.full_scan --max-workers 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-sast-full-scan-report
+          path: |
+            ai_sast_full_scan_report_*.html
+            ai_sast_full_scan_report_*.txt
+          retention-days: 30

@@ -1,8 +1,21 @@
 """
-Configuration file for Vertex AI API client
+Configuration file for AI-SAST LLM backends (Vertex AI, Ollama)
 """
 
 import os
+
+# ============================================================================
+# LLM Backend Selection
+# ============================================================================
+
+# LLM_BACKEND: Choose which LLM backend to use
+# Options: "vertex" (Google Vertex AI) or "ollama" (local open-source)
+# Default: "vertex"
+LLM_BACKEND = os.getenv("LLM_BACKEND", "vertex").lower()
+
+# ============================================================================
+# Vertex AI Configuration (Google Cloud)
+# ============================================================================
 
 # GOOGLE_CLOUD_PROJECT or GOOGLE_PROJECT_ID: Your Google Cloud project ID
 # Example: "my-company-production" or "security-scanning-project"
@@ -12,14 +25,10 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GOOGLE_PROJECT_ID",
 # Example: "us-central1", "us-east1", "europe-west1", "asia-southeast1"
 LOCATION = os.getenv("VERTEX_AI_LOCATION") or os.getenv("GOOGLE_LOCATION", "us-central1")
 
-DEFAULT_TEXT_MODEL = "text-bison@001"
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash-exp"
-DEFAULT_EMBEDDING_MODEL = "textembedding-gecko@001"
-
-DEFAULT_MAX_OUTPUT_TOKENS = 1024
-DEFAULT_TEMPERATURE = 0.2
-DEFAULT_TOP_K = 40
-DEFAULT_TOP_P = 0.8
+# GEMINI_MODEL: Gemini model to use for security analysis
+# Example: "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-2.5-pro"
+# Default: "gemini-2.0-flash-exp" (fast, low-cost, good for most scans)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
 
 # GOOGLE_APPLICATION_CREDENTIALS: Path to service account key file (optional)
 # Example: "/path/to/service-account-key.json" or "~/.gcp/my-project-key.json"
@@ -28,6 +37,32 @@ SERVICE_ACCOUNT_KEY_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", None)
 # GOOGLE_TOKEN: Google Cloud authentication token - service account JSON or access token (optional)
 # Example: Raw JSON string or base64-encoded service account key
 GOOGLE_TOKEN = os.getenv("GOOGLE_TOKEN", None)
+
+# ============================================================================
+# Ollama Configuration (Local Open-Source)
+# ============================================================================
+
+# OLLAMA_BASE_URL: Ollama API endpoint
+# Default: "http://localhost:11434"
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+# OLLAMA_MODEL: Model to use with Ollama
+# Recommended: "qwen2.5-coder:14b", "codellama:13b", "llama3.1:8b"
+# Default: "qwen2.5-coder:14b" (best balance for code security analysis)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
+
+# ============================================================================
+# Legacy/Shared Configuration
+# ============================================================================
+
+DEFAULT_TEXT_MODEL = "text-bison@001"
+DEFAULT_GEMINI_MODEL = GEMINI_MODEL  # For backward compatibility
+DEFAULT_EMBEDDING_MODEL = "textembedding-gecko@001"
+
+DEFAULT_MAX_OUTPUT_TOKENS = 1024
+DEFAULT_TEMPERATURE = 0.2
+DEFAULT_TOP_K = 40
+DEFAULT_TOP_P = 0.8
 
 AVAILABLE_REGIONS = [
     "us-central1",

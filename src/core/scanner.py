@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Security vulnerability scanner using Vertex AI
+Security vulnerability scanner using AI (Vertex AI or Ollama)
 
 This module provides functionality to scan source code for security vulnerabilities
-using Google Cloud Vertex AI models.
+using either Google Cloud Vertex AI or local Ollama models.
 """
 
 import sys
@@ -19,8 +19,19 @@ import shutil
 import time
 import logging
 
-from .vertex import VertexAIClient
-from .config import PROJECT_ID, LOCATION
+from .config import (
+    LLM_BACKEND, 
+    PROJECT_ID, LOCATION, GEMINI_MODEL,
+    OLLAMA_BASE_URL, OLLAMA_MODEL
+)
+
+# Import LLM clients based on backend
+if LLM_BACKEND == "ollama":
+    from ..integrations.ollama import OllamaClient
+    VertexAIClient = None
+else:
+    from .vertex import VertexAIClient
+    OllamaClient = None
 
 # Optional integrations - import only if available
 try:
@@ -42,11 +53,34 @@ class SecurityScanner:
     """
     Security vulnerability scanner using Vertex AI
     """
-    
-    DEFAULT_FILE_PATTERNS = [
-        '*.py', '*.js', '*.ts', '*.java', '*.cpp', '*.c', '*.h',
-        '*.php', '*.rb', '*.go', '*.rs', '*.cs', '*.sql', '*.sh', '*.graphql'
-    ]
+
+    @staticmethod
+    def _load_file_extensions() -> List[str]:
+        """Load file extensions from ai-sast-extensions.txt file"""
+        try:
+            # Get the project root directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            extensions_file = os.path.join(project_root, 'ai-sast-extensions.txt')
+            
+            if os.path.exists(extensions_file):
+                with open(extensions_file, 'r') as f:
+                    patterns = []
+                    for line in f:
+                        line = line.strip()
+                        # Skip comments and empty lines
+                        if line and not line.startswith('#'):
+                            patterns.append(line)
+                    if patterns:
+                        return patterns
+        except Exception as e:
+            logging.warning(f"Could not load file extensions from ai-sast-extensions.txt: {e}")
+        
+        # Fallback patterns if file doesn't exist or has issues
+        return [
+            '*.py', '*.js', '*.ts', '*.java', '*.cpp', '*.c', '*.h',
+            '*.php', '*.rb', '*.go', '*.rs', '*.cs', '*.sql', '*.sh', '*.graphql'
+        ]
 
     @staticmethod
     def _load_default_prompt() -> str:
@@ -87,15 +121,26 @@ Format your response for each finding as:
         Initialize the security scanner
         
         Args:
-            project_id: Google Cloud Project ID
-            location: GCP region
+            project_id: Google Cloud Project ID (only for Vertex AI backend)
+            location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
-        self.client = VertexAIClient(
-            project_id or PROJECT_ID,
-            location or LOCATION
-        )
-        print(f"🤖 Using Gemini 2.0 Flash model for security analysis")
+        # Initialize LLM client based on backend
+        if LLM_BACKEND == "ollama":
+            print(f"🔧 LLM Backend: Ollama (local)")
+            self.client = OllamaClient(
+                base_url=OLLAMA_BASE_URL,
+                model=OLLAMA_MODEL
+            )
+            self.backend = "ollama"
+        else:
+            print(f"🔧 LLM Backend: Vertex AI (Google Cloud)")
+            self.client = VertexAIClient(
+                project_id or PROJECT_ID,
+                location or LOCATION
+            )
+            print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
+            self.backend = "vertex"
         
         # CI_PROJECT_URL (GitLab) or GITHUB_REPOSITORY (GitHub): Repository identifier
         # Example GitLab: "https://gitlab.com/myorg/myproject"
@@ -284,12 +329,16 @@ Format your response for each finding as:
         )
         
         max_retries = 5
-        backoff_factor = 2
+        backoff_factor = 3  # Increased from 2 to 3 for longer waits
         
         for attempt in range(max_retries):
             try:
-                # Use Gemini 2.0 Flash model
-                analysis = self.client.generate_with_gemini(prompt, model_name="gemini-2.0-flash-exp")
+                # Call LLM based on backend
+                if self.backend == "ollama":
+                    analysis = self.client.generate(prompt, temperature=0.2)
+                else:
+                    # Vertex AI backend
+                    analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
                 
                 return {
                     "file_path": file_path,
@@ -299,10 +348,10 @@ Format your response for each finding as:
                 }
             except Exception as e:
                 error_message = str(e)
-                # Check for rate limit error (429)
+                # Check for rate limit error (429) - Vertex AI specific
                 if "429" in error_message and "Resource exhausted" in error_message:
                     if attempt < max_retries - 1:
-                        wait_time = backoff_factor ** attempt
+                        wait_time = backoff_factor ** (attempt + 1)  # Exponential: 3, 9, 27, 81 seconds
                         print(f"⚠️ Rate limit hit for {file_path}. Retrying in {wait_time}s... (Attempt {attempt + 1}/{max_retries})")
                         time.sleep(wait_time)
                         continue
@@ -381,7 +430,7 @@ Format your response for each finding as:
         """
         
         if file_patterns is None:
-            file_patterns = self.DEFAULT_FILE_PATTERNS
+            file_patterns = self._load_file_extensions()
         
         # --- Exclusion Logic ---
         # AI_SAST_EXCLUDE_PATHS: Comma-separated paths to exclude from scanning (optional)
@@ -447,6 +496,10 @@ Format your response for each finding as:
                     # Override the absolute path with the correct relative path for reporting
                     result['file_path'] = rel_path
                     scan_results.append(result)
+                    
+                    # Add delay to avoid rate limits when processing results
+                    if max_workers > 1:
+                        time.sleep(1)
                 except Exception as e:
                     print(f"Error scanning file {rel_path}: {e}")
                     scan_results.append({
@@ -594,7 +647,7 @@ Format your response for each finding as:
             List of file paths
         """
         if file_patterns is None:
-            file_patterns = self.DEFAULT_FILE_PATTERNS
+            file_patterns = self._load_file_extensions()
         
         # Exclusion logic
         default_exclude_keywords = ['test', 'node_modules', '.git']

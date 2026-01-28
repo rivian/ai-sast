@@ -1,6 +1,78 @@
 # Integrations Guide
 
-AI-SAST has built-in SQLite storage for scan results and feedback. External integrations are optional.
+AI-SAST supports multiple backends and integrations:
+
+## Core: LLM Backends
+
+### Vertex AI (Google Cloud) - Default
+
+**Purpose:** Production-grade AI analysis using Google's Gemini models
+
+**Setup:**
+```bash
+export LLM_BACKEND="vertex"
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export VERTEX_AI_LOCATION="us-central1"
+export GEMINI_MODEL="gemini-2.0-flash-exp"
+```
+
+**Pros:**
+- Production-ready, highly reliable
+- Latest Gemini models
+- Automatic scaling
+
+**Cons:**
+- Requires Google Cloud account
+- API costs apply
+- Code sent to cloud
+
+---
+
+### Ollama (Local Open-Source) - New! ⭐
+
+**Purpose:** Run security scans completely locally using open-source models
+
+**Setup:**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a model
+ollama pull qwen2.5-coder:14b
+
+# Configure AI-SAST
+export LLM_BACKEND="ollama"
+export OLLAMA_MODEL="qwen2.5-coder:14b"
+export OLLAMA_BASE_URL="http://localhost:11434"
+```
+
+**Recommended Models:**
+- `qwen2.5-coder:14b` - **Recommended** - Best balance (8GB RAM)
+- `qwen2.5-coder:7b` - Fast, code-focused (4GB RAM)
+- `qwen2.5-coder:32b` - Most accurate (20GB RAM)
+- `codellama:13b` - Meta's code model (8GB RAM)
+- `llama3.1:8b` - Latest Llama (5GB RAM)
+- `deepseek-coder:33b` - Alternative, very capable (20GB RAM)
+
+**Pros:**
+- ✅ 100% free and open-source
+- ✅ Complete privacy (code never leaves your machine)
+- ✅ No rate limits or API costs
+- ✅ Works offline
+
+**Cons:**
+- Requires local resources (4-40GB RAM depending on model)
+- Slower than cloud models (depends on hardware)
+- Need to manage models yourself
+
+**Example:**
+```python
+# See examples/ollama_scan.py
+export LLM_BACKEND="ollama"
+python -m src.main.pr_scan
+```
+
+---
 
 ## Built-in SQLite Database
 
