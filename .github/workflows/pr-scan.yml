@@ -1,0 +1,50 @@
+name: AI-SAST PR Scan
+
+on:
+  pull_request:
+    branches: [ dev ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-scan:
+    name: Security Scan on PR Changes
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    env:
+      GOOGLE_LOCATION: us-central1
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      VERTEX_AI_LOCATION: us-central1
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+      
+      - name: Run AI-SAST on PR Diff
+        run: |
+          echo "Running AI-SAST on PR changes only"
+          python -m src.main.pr_scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
