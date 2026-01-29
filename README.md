@@ -17,9 +17,10 @@ AI-SAST is a powerful, AI-driven static application security testing tool that s
 - 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more (see `ai-sast-extensions.txt`)
 - 🎯 **Smart Filtering**: Configurable exclusion patterns to focus on relevant code
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
-- 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
+- 💾 **Feedback Loop**: Built-in SQLite for storing scan results and feedback (no external services required)
 - 🔒 **Privacy Options**: Keep your code on-premise with Ollama backend
-- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments
+- 🎯 **Context-Aware**: Jira integration provides LLM with historical vulnerability patterns for improved accuracy
+- 🔌 **Enterprise Ready**: Optional Databricks/Vector storage for organization-wide learning and analytics
 
 ## 🏛️ Architecture
 
@@ -128,61 +129,109 @@ Developers can mark findings as true/false positives to improve accuracy over ti
 
 ---
 
+## 💡 Highly Recommended
+
+### Jira Integration (Improves Accuracy)
+
+Integrating with Jira provides context to the LLM about known vulnerability patterns, significantly improving finding accuracy:
+
+```bash
+export JIRA_SERVER="https://your-company.atlassian.net"
+export JIRA_EMAIL="your-email@company.com"
+export JIRA_API_TOKEN="your-jira-api-token"
+export JIRA_PROJECT_KEY="SEC"  # Your security project key
+```
+
+**Why it helps:**
+- LLM learns from historical security tickets
+- Reduces false positives by understanding your codebase patterns
+- Prioritizes findings based on real vulnerabilities found in the past
+
+### Feedback Storage (Continuous Improvement)
+
+Choose a storage backend to capture developer feedback and improve over time:
+
+**SQLite (Default - Included)**
+- ✅ Zero configuration
+- ✅ Stored locally at `~/.ai-sast/scans.db`
+- ✅ Perfect for single teams/repositories
+
+**Vector/Databricks (Enterprise)**
+- ✅ Centralized storage across all teams
+- ✅ Organization-wide learning
+- ✅ Advanced analytics and trends
+- ✅ Scales to 1000+ repositories
+
+```bash
+# Databricks example
+export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
+export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
+export DATABRICKS_ACCESS_TOKEN="your-access-token"
+```
+
+**Why it matters:**
+- Developers mark findings as true/false positives
+- System learns from feedback to reduce false positives
+- Accuracy improves continuously with each scan
+
+📚 **Full setup guide:** [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
+
+### Customization (Fine-tune Scanning)
+
+**Filter PR comment severities:**
+```bash
+# Default: Show only Critical and High in PR comments
+export AI_SAST_SEVERITY="critical,high"
+
+# Show all severities (more verbose)
+export AI_SAST_SEVERITY="critical,high,medium,low"
+
+# Show only Critical (very strict)
+export AI_SAST_SEVERITY="critical"
+```
+
+**Note:** Full HTML reports always include all severities. This only affects PR comments.
+
+**For GitHub Actions:** Set as repository variable at Settings → Actions → Variables:
+- Name: `AI_SAST_SEVERITY`
+- Value: `critical,high,medium` (or your preference)
+
+**Exclude paths from scanning:**
+```bash
+export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs"
+```
+
+**Custom AI instructions:**
+```bash
+export AI_SAST_CUSTOM_PROMPT="Focus on authentication and SQL injection vulnerabilities"
+```
+
+**Supported languages:** Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, GraphQL
+*(Edit `ai-sast-extensions.txt` to customize)*
+
+---
+
 ## ⚙️ Configuration
 
 ### Required Environment Variables (Vertex AI)
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `GOOGLE_CLOUD_PROJECT` | GCP project ID | `my-company-prod` |
-| `GOOGLE_TOKEN` | Service account JSON (GitHub Actions) | `{"type":"service_account"...}` |
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Your GCP project ID |
+| `GOOGLE_TOKEN` | Service account JSON (for GitHub Actions) |
 
 ### Optional Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GOOGLE_LOCATION` | GCP region | `us-central1` |
-| `GEMINI_MODEL` | Model name | `gemini-2.0-flash-exp` |
+| `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
 | `LLM_BACKEND` | `vertex` or `ollama` | `vertex` |
 | `OLLAMA_MODEL` | Ollama model (if using Ollama) | `qwen2.5-coder:14b` |
-| `AI_SAST_SEVERITY` | PR comment severities | `critical,high` |
-| `AI_SAST_EXCLUDE_PATHS` | Paths to skip | - |
-| `AI_SAST_CUSTOM_PROMPT` | Additional AI instructions | - |
+
+**For customization options (severity, exclusions, prompts)**, see "💡 Highly Recommended" section above.
 
 **For webhook/enterprise features**, see [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| **LLM Backend** |
-| `LLM_BACKEND` | Backend to use: `vertex` or `ollama` | No | `vertex` |
-| **Vertex AI (Cloud)** |
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | Yes (for vertex) | - |
-| `GOOGLE_LOCATION` | Vertex AI location/region | No | `us-central1` |
-| `GEMINI_MODEL` | Gemini model to use | No | `gemini-2.0-flash-exp` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key JSON file | No | - |
-| `GOOGLE_TOKEN` | Service account JSON or access token | Yes (GitHub Actions) | - |
-| **Ollama (Local)** |
-| `OLLAMA_BASE_URL` | Ollama API endpoint | No | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Model to use with Ollama | No | `qwen2.5-coder:14b` |
-| **Scanning** |
-| `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | No | (see below) |
-| `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | No | - |
-**For webhook/enterprise features**, see [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
-
-### Customization
-
-**Exclude paths:**
-```bash
-export AI_SAST_EXCLUDE_PATHS="dist,build,vendor"
-```
-
-**Custom AI instructions:**
-```bash
-export AI_SAST_CUSTOM_PROMPT="Focus on authentication and SQL injection"
-```
-
-**Supported languages:** Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, GraphQL
-*(Edit `ai-sast-extensions.txt` to customize)*
 
 ---
 
