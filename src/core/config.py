@@ -17,13 +17,13 @@ LLM_BACKEND = os.getenv("LLM_BACKEND", "vertex").lower()
 # Vertex AI Configuration (Google Cloud)
 # ============================================================================
 
-# GOOGLE_CLOUD_PROJECT or GOOGLE_PROJECT_ID: Your Google Cloud project ID
+# GOOGLE_CLOUD_PROJECT: Your Google Cloud project ID
 # Example: "my-company-production" or "security-scanning-project"
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GOOGLE_PROJECT_ID", "your-project-id")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
 
-# VERTEX_AI_LOCATION or GOOGLE_LOCATION: Google Cloud region for Vertex AI
+# GOOGLE_LOCATION: Google Cloud region for Vertex AI
 # Example: "us-central1", "us-east1", "europe-west1", "asia-southeast1"
-LOCATION = os.getenv("VERTEX_AI_LOCATION") or os.getenv("GOOGLE_LOCATION", "us-central1")
+LOCATION = os.getenv("GOOGLE_LOCATION", "us-central1")
 
 # GEMINI_MODEL: Gemini model to use for security analysis
 # Example: "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-2.5-pro"
@@ -89,7 +89,7 @@ def validate_config():
     errors = []
     
     if PROJECT_ID == "your-project-id":
-        errors.append("Please set your Google Cloud Project ID in the GOOGLE_CLOUD_PROJECT or GOOGLE_PROJECT_ID environment variable")
+        errors.append("Please set your Google Cloud Project ID in the GOOGLE_CLOUD_PROJECT environment variable")
     
     if LOCATION not in AVAILABLE_REGIONS:
         errors.append(f"Invalid location: {LOCATION}. Available regions: {', '.join(AVAILABLE_REGIONS)}")
