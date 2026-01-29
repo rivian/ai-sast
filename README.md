@@ -19,7 +19,7 @@ AI-SAST is a powerful, AI-driven static application security testing tool that s
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
 - 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
 - 🔒 **Privacy Options**: Keep your code on-premise with Ollama backend
-- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments (see [INTEGRATIONS.md](INTEGRATIONS.md))
+- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments
 
 ## 🏛️ Architecture
 
@@ -51,7 +51,7 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
    - Databricks option for enterprise deployments
    - Reduces false positives over time
 
-📖 **For detailed architecture documentation**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+📖 **For detailed architecture**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 🚀 Quick Start
 
@@ -80,7 +80,7 @@ python setup.py
 # Configure
 export LLM_BACKEND="vertex"
 export GOOGLE_CLOUD_PROJECT="your-project-id"
-export VERTEX_AI_LOCATION="us-central1"
+export GOOGLE_LOCATION="us-central1"
 export GEMINI_MODEL="gemini-2.0-flash-exp"  # or gemini-2.5-pro
 ```
 
@@ -333,8 +333,6 @@ export LLM_BACKEND="ollama"
 4. **SSD**: Store models on SSD for faster loading
 5. **Keep models updated**: Run `ollama pull <model>` periodically
 
-📚 **For detailed configuration**, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
-
 ---
 
 ### Prerequisites
@@ -368,7 +366,7 @@ Set your Google Cloud project ID and location:
 
 ```bash
 export GOOGLE_CLOUD_PROJECT="your-project-id"
-export VERTEX_AI_LOCATION="us-central1"
+export GOOGLE_LOCATION="us-central1"
 ```
 
 Or source the `env_config.txt` file:
@@ -424,8 +422,7 @@ The project includes a GitHub Actions workflow for automated scanning. To use it
 
 1. **Set up GitHub Secrets**:
    - `GOOGLE_CREDENTIALS`: Your Google Cloud service account key (JSON)
-   - `GOOGLE_PROJECT_ID`: Your Google Cloud Project ID
-   - `GOOGLE_LOCATION` (optional): Vertex AI location (default: us-central1)
+   - `GOOGLE_CLOUD_PROJECT`: Your Google Cloud Project ID
 
 2. **Add the workflow** (already included in `.github/workflows/security-scan.yml`):
    - **On Pull Requests**: Scans only changed files (fast, targeted)
@@ -450,7 +447,7 @@ The project includes a GitHub Actions workflow for automated scanning. To use it
 
 By default, feedback is automatically stored in SQLite at `~/.ai-sast/scans.db`. 
 
-For enterprise deployments with webhook integration:
+**For enterprise deployments with webhook integration:**
 
 1. **Deploy webhook listener** (optional):
    ```bash
@@ -460,40 +457,116 @@ For enterprise deployments with webhook integration:
    ```
 
 2. **Configure GitHub webhook**:
+   - Go to: Repository Settings → Webhooks → Add webhook
    - Payload URL: `https://your-webhook-url.com/webhook`
    - Content type: `application/json`
-   - Events: Issue comments
+   - Events: Select "Issue comments"
+   - Active: ✓
    
-3. **(Optional) Use Databricks** for centralized storage (see [INTEGRATIONS.md](INTEGRATIONS.md))
+3. **Webhook Environment Variables** (if deploying):
+   ```bash
+   export GITHUB_WEBHOOK_SECRET="your-webhook-secret"  # Optional security
+   export AI_SAST_DB_PATH="~/.ai-sast/scans.db"        # Database path
+   ```
 
-📚 **For detailed webhook setup instructions**, see [webhook/README.md](webhook/README.md)
+4. **(Optional) Use Databricks** for centralized multi-team storage:
+   ```bash
+   # Uncomment databricks-sql-connector in requirements.txt
+   export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
+   export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
+   export DATABRICKS_ACCESS_TOKEN="your-access-token"
+   ```
+
+**How the feedback loop works:**
+1. AI-SAST posts findings as PR comments with checkboxes
+2. Developers check ✅ True Positive or ❌ False Positive
+3. Webhook captures the edit and stores feedback in SQLite/Databricks
+4. Future scans learn from this feedback to reduce false positives
 
 ## ⚙️ Configuration Options
 
+### Optional Enterprise Integrations
+
+AI-SAST includes optional integrations for enterprise deployments:
+
+<details>
+<summary><b>📊 Databricks (Multi-team feedback storage)</b></summary>
+
+**Purpose:** Centralized feedback storage across multiple teams/repositories
+
+**Setup:**
+```bash
+# Uncomment in requirements.txt
+# databricks-sql-connector>=2.0.0
+
+pip install databricks-sql-connector
+
+export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
+export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
+export DATABRICKS_ACCESS_TOKEN="your-access-token"
+```
+
+**Usage:** Automatically used if environment variables are set. Falls back to SQLite if not configured.
+</details>
+
+<details>
+<summary><b>🎫 Jira (Known vulnerability patterns)</b></summary>
+
+**Purpose:** Integrate with Jira to track security issues and known vulnerability patterns
+
+**Setup:**
+```bash
+export JIRA_SERVER="https://your-company.atlassian.net"
+export JIRA_EMAIL="your-email@company.com"
+export JIRA_API_TOKEN="your-jira-api-token"
+export JIRA_PROJECT_KEY="SEC"  # Your security project key
+```
+
+**Note:** Jira integration is optional and primarily for tracking/reporting.
+</details>
+
+<details>
+<summary><b>📢 Notifications (Slack/Teams/Discord)</b></summary>
+
+**Purpose:** Send scan results to team chat channels
+
+**Setup:**
+```bash
+# Slack
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+# Microsoft Teams
+export TEAMS_WEBHOOK_URL="https://your-org.webhook.office.com/webhookb2/..."
+
+# Discord
+export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+```
+
+**Usage:** Notifications are sent automatically if webhook URLs are configured.
+</details>
+
+---
+
 ### Environment Variables (Quick Reference)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
 | **LLM Backend** |
-| `LLM_BACKEND` | Backend to use: `vertex` or `ollama` | `vertex` |
+| `LLM_BACKEND` | Backend to use: `vertex` or `ollama` | No | `vertex` |
 | **Vertex AI (Cloud)** |
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | (required for vertex) |
-| `GOOGLE_PROJECT_ID` | Alternative to GOOGLE_CLOUD_PROJECT | (required for vertex) |
-| `VERTEX_AI_LOCATION` | Vertex AI location/region | `us-central1` |
-| `GOOGLE_LOCATION` | Alternative to VERTEX_AI_LOCATION | `us-central1` |
-| `GEMINI_MODEL` | Gemini model to use | `gemini-2.0-flash-exp` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key | (optional) |
-| `GOOGLE_TOKEN` | Google Cloud token (JSON or base64) | (optional) |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | Yes (for vertex) | - |
+| `GOOGLE_LOCATION` | Vertex AI location/region | No | `us-central1` |
+| `GEMINI_MODEL` | Gemini model to use | No | `gemini-2.0-flash-exp` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key JSON file | No | - |
+| `GOOGLE_TOKEN` | Service account JSON or access token | Yes (GitHub Actions) | - |
 | **Ollama (Local)** |
-| `OLLAMA_BASE_URL` | Ollama API endpoint | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Model to use with Ollama | `qwen2.5-coder:14b` |
+| `OLLAMA_BASE_URL` | Ollama API endpoint | No | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Model to use with Ollama | No | `qwen2.5-coder:14b` |
 | **Scanning** |
-| `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | (see below) |
-| `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | (optional) |
-| `AI_SAST_SEVERITY` | Comma-separated severities for PR comments | `critical,high` |
-| `AI_SAST_DB_PATH` | Path to SQLite database | `~/.ai-sast/scans.db` |
-
-📚 **For optional integrations**, see **[INTEGRATIONS.md](INTEGRATIONS.md)**
+| `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | No | (see below) |
+| `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | No | - |
+| `AI_SAST_SEVERITY` | Severities for PR comments: `critical,high,medium,low` | No | `critical,high` |
+| `AI_SAST_DB_PATH` | Path to SQLite database | No | `~/.ai-sast/scans.db` |
 
 ### Default Exclusions
 
@@ -564,26 +637,27 @@ sed -i 's/^\*.php$/# *.php/' ai-sast-extensions.txt
 
 ### Complete Environment Variable Reference
 
-#### Core Configuration
+#### Core Configuration (Vertex AI)
 
 ```bash
-# GOOGLE_CLOUD_PROJECT or GOOGLE_PROJECT_ID (Required)
+# GOOGLE_CLOUD_PROJECT (Required for Vertex AI)
 export GOOGLE_CLOUD_PROJECT="my-company-production"
-# Or: export GOOGLE_PROJECT_ID="security-scanning-project"
 
-# VERTEX_AI_LOCATION (Optional, default: us-central1)
-export VERTEX_AI_LOCATION="us-central1"
+# GOOGLE_LOCATION (Optional, default: us-central1)
+export GOOGLE_LOCATION="us-central1"
 # Other options: "us-east1", "europe-west1", "asia-southeast1"
 
 # GEMINI_MODEL (Optional, default: gemini-2.0-flash-exp)
 export GEMINI_MODEL="gemini-2.0-flash-exp"
-# Other options: "gemini-1.5-pro", "gemini-2.5-pro" (requires higher quota)
+# Other options: "gemini-1.5-pro", "gemini-2.5-pro"
 
-# GOOGLE_APPLICATION_CREDENTIALS (Optional)
+# GOOGLE_APPLICATION_CREDENTIALS (Optional for local development)
+# Use gcloud auth application-default login instead when possible
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
-# GOOGLE_TOKEN (Optional)
-export GOOGLE_TOKEN='{"type":"service_account","project_id":"my-project",...}'
+# GOOGLE_TOKEN (Required for GitHub Actions only)
+# Automatically set by google-github-actions/auth action
+# Manual format: export GOOGLE_TOKEN='{"type":"service_account","project_id":"...",...}'
 ```
 
 #### Scanning Configuration
@@ -639,15 +713,22 @@ Create a `.env` file:
 # .env - AI-SAST Configuration
 # DO NOT COMMIT THIS FILE
 
-# === Core Configuration (Required) ===
-GOOGLE_CLOUD_PROJECT=
-VERTEX_AI_LOCATION=us-central1
+# === LLM Backend Selection ===
+LLM_BACKEND=vertex  # or "ollama" for local
+
+# === Vertex AI Configuration (Required if LLM_BACKEND=vertex) ===
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_LOCATION=us-central1
 GEMINI_MODEL=gemini-2.0-flash-exp
 
+# === Ollama Configuration (Required if LLM_BACKEND=ollama) ===
+# OLLAMA_BASE_URL=http://localhost:11434
+# OLLAMA_MODEL=qwen2.5-coder:14b
+
 # === Scanning Configuration (Optional) ===
-AI_SAST_EXCLUDE_PATHS=
-AI_SAST_CUSTOM_PROMPT=
-AI_SAST_SEVERITY=critical,high
+# AI_SAST_EXCLUDE_PATHS=dist,build,vendor
+# AI_SAST_CUSTOM_PROMPT=Focus on SQL injection and XSS
+# AI_SAST_SEVERITY=critical,high
 ```
 
 Then load it:
@@ -727,7 +808,7 @@ ai-sast/
 ├── prompts/
 │   └── default_prompt.txt     # Default AI scanning prompt
 ├── docs/
-│   ├── ARCHITECTURE.md        # Architecture documentation
+│   ├── ARCHITECTURE.md        # System architecture
 │   └── images/
 │       └── architecture.png   # Architecture diagram
 ├── examples/                  # Example usage scripts
@@ -736,9 +817,7 @@ ai-sast/
 ├── requirements.txt           # Python dependencies
 ├── setup.py                   # Setup script
 ├── LICENSE                    # Apache License 2.0
-├── CHANGELOG.md               # Version history
 ├── CONTRIBUTING.md            # Contribution guidelines
-├── INTEGRATIONS.md            # Optional integrations guide
 └── README.md                  # This file
 ```
 
@@ -769,7 +848,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ### Authentication Errors
 - Verify you're authenticated with `gcloud` or have set credentials
 - Check service account has "Vertex AI User" role
-- Ensure `GOOGLE_PROJECT_ID` is correct
+- Ensure `GOOGLE_CLOUD_PROJECT` is correct
 
 ### Model Not Available (404 Error)
 - AI-SAST uses `gemini-2.0-flash-exp` model by default
@@ -805,14 +884,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 🗺️ Roadmap
 
-- [ ] Support for additional AI models (Claude, GPT-4, etc.)
-- [ ] Integration with SARIF format for GitHub Code Scanning
-- [ ] Support for GitLab CI/CD
-- [ ] Web dashboard for report visualization
-- [ ] Custom rule definitions
-- [ ] Integration with issue trackers (GitHub Issues, Jira)
-- [ ] Incremental scanning (only changed files)
-- [ ] False positive feedback loop
+- [ ] Parallel file scanning for faster scans
 
 ---
 

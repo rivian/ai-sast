@@ -2,260 +2,356 @@
 
 ## Overview
 
-AI-SAST is an AI-powered SAST tool that scans code for vulnerabilities using either:
-- **Vertex AI** (Google Gemini) - Cloud-based
-- **Ollama** (open-source models) - Local
+AI-SAST is an AI-powered static application security testing tool that combines traditional security scanning with large language models for intelligent vulnerability detection.
 
-## High-Level Flow
+## System Architecture
 
 ```
-┌─────────────┐
-│   GitHub    │
-│  PR / Push  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│   GitHub    │
-│   Actions   │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐      ┌──────────────┐
-│  AI-SAST    │─────→│ Vertex AI /  │
-│   Scanner   │      │    Ollama    │
-└──────┬──────┘      └──────────────┘
-       │
-       ├──→ PR Comment (Critical/High findings)
-       ├──→ HTML Report (All findings)
-       └──→ SQLite DB (Scan results + feedback)
+┌─────────────────────────────────────────────────────────────────┐
+│                        GitHub Repository                         │
+└────────────────────────┬────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     GitHub Actions Workflow                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌─────────────────────┐  │
+│  │  Gitleaks    │  │   PR Scan    │  │   Full Scan         │  │
+│  │  (Secrets)   │  │  (Changed)   │  │   (All Files)       │  │
+│  └──────────────┘  └──────────────┘  └─────────────────────┘  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      AI-SAST Scanner                             │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │  1. File Collection & Filtering                        │    │
+│  │     - Load file extensions from ai-sast-extensions.txt │    │
+│  │     - Apply exclusion patterns                         │    │
+│  │     - Filter test files, dependencies, etc.            │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                             │                                    │
+│                             ▼                                    │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │  2. LLM Backend Selection                              │    │
+│  │     ┌─────────────────┐      ┌──────────────────┐     │    │
+│  │     │   Vertex AI     │  OR  │     Ollama       │     │    │
+│  │     │   (Cloud)       │      │     (Local)      │     │    │
+│  │     └─────────────────┘      └──────────────────┘     │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                             │                                    │
+│                             ▼                                    │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │  3. Code Analysis                                       │    │
+│  │     - Load security scanning prompt                     │    │
+│  │     - Send code + context to LLM                        │    │
+│  │     - Parse vulnerability findings                      │    │
+│  │     - Calculate CVSS scores                             │    │
+│  │     - Generate unique vuln IDs                          │    │
+│  └────────────────────────────────────────────────────────┘    │
+│                             │                                    │
+│                             ▼                                    │
+│  ┌────────────────────────────────────────────────────────┐    │
+│  │  4. Report Generation                                   │    │
+│  │     - HTML report (all severities)                      │    │
+│  │     - Markdown PR comment (critical/high)               │    │
+│  │     - Filter by AI_SAST_SEVERITY                        │    │
+│  │     - Add interactive checkboxes                        │    │
+│  └────────────────────────────────────────────────────────┘    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+        ┌────────────────────┴────────────────────┐
+        │                                         │
+        ▼                                         ▼
+┌──────────────────┐                  ┌──────────────────────┐
+│  SQLite Database │                  │  GitHub PR Comment   │
+│  ~/.ai-sast/     │                  │  (with checkboxes)   │
+│  - Scan results  │                  └──────────┬───────────┘
+│  - Feedback      │                             │
+└──────────────────┘                             │
+                                                  │
+                                    ┌─────────────▼─────────────┐
+                                    │  Developer Reviews        │
+                                    │  ☑ True Positive          │
+                                    │  ☐ False Positive         │
+                                    └─────────────┬─────────────┘
+                                                  │
+                                                  ▼
+                                    ┌─────────────────────────┐
+                                    │  GitHub Webhook         │
+                                    │  (Optional)             │
+                                    └─────────────┬───────────┘
+                                                  │
+                                                  ▼
+                                    ┌─────────────────────────┐
+                                    │  Feedback Storage       │
+                                    │  - SQLite (default)     │
+                                    │  - Databricks (optional)│
+                                    └─────────────────────────┘
 ```
 
 ## Core Components
 
-### 1. Scanner (`src/core/scanner.py`)
-- Scans code for vulnerabilities
-- Supports both Vertex AI and Ollama backends
-- Applies exclusion rules and file filters
-- Generates structured vulnerability reports
+### 1. Scanner Engine (`src/core/scanner.py`)
 
-### 2. Report Generator (`src/core/report.py`)
-- Creates HTML reports (all severities)
-- Creates markdown for PR comments (filtered by severity)
-- Generates unique IDs for each finding
-- Includes feedback checkboxes
+**Responsibilities:**
+- File discovery and filtering
+- Code content extraction
+- LLM client initialization
+- Parallel/sequential processing
+- Retry logic with exponential backoff
 
-### 3. Scan Modes
+**Key Features:**
+- Configurable file extensions via `ai-sast-extensions.txt`
+- Smart exclusion patterns (test files, dependencies, etc.)
+- Rate limit handling
+- Support for both Vertex AI and Ollama backends
 
-**PR Scan (`src/main/pr_scan.py`):**
-- Scans only changed files
-- Posts findings as PR comment
-- Fast (< 1 minute for typical PRs)
+### 2. LLM Backends
 
-**Full Scan (`src/main/full_scan.py`):**
-- Scans entire repository
-- Manually triggered
-- Generates comprehensive report
+#### Vertex AI (Google Cloud)
+- **Location:** `src/core/vertex.py`
+- **Models:** Gemini 2.0 Flash, Gemini 2.5 Pro
+- **Use Case:** Production, cloud-based scanning
+- **Authentication:** Google Cloud credentials
 
-### 4. Feedback Loop
+#### Ollama (Local)
+- **Location:** `src/integrations/ollama.py`
+- **Models:** Qwen2.5-Coder, CodeLlama, Llama 3.1, DeepSeek
+- **Use Case:** Privacy-first, local scanning
+- **Requirements:** Ollama service running locally
+
+### 3. Report Generator (`src/core/report.py`)
+
+**Responsibilities:**
+- HTML report generation with all severities
+- Markdown PR comment generation (filtered by severity)
+- CVSS vector string formatting
+- Unique vulnerability ID generation (SHA-1 hash)
+- Interactive checkbox creation
+
+**Severity Filtering:**
+- Controlled by `AI_SAST_SEVERITY` environment variable
+- Options: `critical`, `high`, `medium`, `low`
+- Default: `critical,high`
+
+### 4. Feedback System
+
+#### Storage Layer (`src/integrations/scan_database.py`)
+- **Primary:** SQLite at `~/.ai-sast/scans.db`
+- **Schema:**
+  - `scan_results` table: Initial findings with vuln_id
+  - `feedback` table: Developer feedback (true/false positive)
+
+#### Webhook Listener (`webhook/main.py`)
+- **Framework:** Flask
+- **Trigger:** GitHub issue_comment events
+- **Action:** Parse checkbox changes, store feedback
+- **Deployment:** Docker + ECS (Terraform in `webhook/iac/`)
+
+### 5. GitHub Actions Workflows
+
+#### PR Scan (`.github/workflows/pr-scan.yml`)
+- **Trigger:** Pull requests to main/dev, manual dispatch
+- **Scope:** Only changed files (fast)
+- **Output:** PR comment with critical/high findings, HTML report artifact
+
+#### Full Scan (`.github/workflows/full-scan.yml`)
+- **Trigger:** Manual dispatch only
+- **Scope:** Entire repository
+- **Output:** HTML report artifact
+- **Configuration:** Sequential scanning (`--max-workers 1`)
+
+#### Gitleaks (`.github/workflows/gitleaks.yml`)
+- **Trigger:** Push, manual dispatch
+- **Purpose:** Secret detection
+- **Tool:** Open-source Gitleaks
+
+## Data Flow
+
+### 1. Pull Request Scan Flow
 
 ```
-Developer checks box → Webhook captures → Store in SQLite → Future scans use context
+Developer creates PR
+    │
+    ├─> GitHub Actions triggered
+    │
+    ├─> Fetch changed files (git diff)
+    │
+    ├─> Filter by extensions & exclusions
+    │
+    ├─> For each file:
+    │   ├─> Load prompt from prompts/default_prompt.txt
+    │   ├─> Add custom prompt if AI_SAST_CUSTOM_PROMPT set
+    │   ├─> Send to LLM (Vertex AI or Ollama)
+    │   ├─> Parse JSON response
+    │   └─> Generate vuln_id (SHA-1 hash)
+    │
+    ├─> Generate HTML report (all severities)
+    │
+    ├─> Generate PR comment markdown (filtered by AI_SAST_SEVERITY)
+    │
+    ├─> Post comment to PR
+    │
+    └─> Store results in SQLite
 ```
 
-**Components:**
-- **Webhook** (`webhook/main.py`): Captures PR comment edits
-- **Database** (`src/integrations/scan_database.py`): Stores results + feedback
-- **Context retrieval**: Scanner includes past feedback in AI prompts
+### 2. Feedback Loop Flow
 
-## Key Features
-
-### Unique Vulnerability IDs
-Each finding gets a stable ID: `sha1(file+issue+location)[:8]`
-- Tracks same vulnerability across scans
-- Enables feedback history
-- Prevents duplicate reports
-
-### Severity Filtering
-- **PR comments**: Only configured severities (default: `critical,high`)
-- **HTML reports**: Always include all severities
-- **Configurable**: Via `AI_SAST_SEVERITY` env var
-
-### Smart Context
-Scanner retrieves:
-- Past scan results for the repository
-- Developer feedback (true/false positives)
-- Jira tickets (optional)
-- Includes in AI prompt for better accuracy
-
-## Data Storage
-
-### SQLite (Default)
-**Location:** `~/.ai-sast/scans.db`
-
-**Tables:**
-- `scan_results`: Initial findings (with vuln_id)
-- `feedback`: Developer feedback (true/false positive)
-
-**No setup required** - works automatically!
-
-### Databricks (Optional)
-For enterprise multi-team deployments. See [INTEGRATIONS.md](../INTEGRATIONS.md).
-
-## GitHub Actions Integration
-
-### Workflows
-
-1. **`.github/workflows/pr-scan.yml`**
-   - Triggers on PR to main/dev
-   - Scans changed files
-   - Posts PR comment
-   - Uploads artifacts
-
-2. **`.github/workflows/full-scan.yml`**
-   - Manually triggered (`workflow_dispatch`)
-   - Scans entire repository
-   - Uploads comprehensive report
-
-3. **`.github/workflows/gitleaks.yml`**
-   - Secret detection on push
-   - Runs in parallel with AI-SAST
-
-### Required Secrets
-
-**For Vertex AI:**
-- `GOOGLE_CLOUD_PROJECT`: GCP project ID
-- `GOOGLE_CREDENTIALS`: Service account JSON
-
-**For Ollama:**
-- None (runs locally, not in GitHub Actions)
-
-## LLM Backend Selection
-
-### Vertex AI (Default in GitHub Actions)
-```yaml
-env:
-  LLM_BACKEND: vertex  # or omit (default)
-  GEMINI_MODEL: gemini-2.0-flash-exp
+```
+Developer reviews PR comment
+    │
+    ├─> Clicks "Edit" on comment
+    │
+    ├─> Checks ☑ True Positive or ☑ False Positive
+    │
+    ├─> Saves comment
+    │
+    ├─> GitHub sends webhook event
+    │
+    ├─> Webhook listener receives event
+    │
+    ├─> Extract vuln_id from hidden HTML comment
+    │
+    ├─> Parse checkbox state
+    │
+    ├─> Store feedback:
+    │   ├─> SQLite (default)
+    │   └─> Databricks (if configured)
+    │
+    └─> Future scans can reference this feedback
 ```
 
-### Ollama (For Local Development)
+## Configuration
+
+### Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `LLM_BACKEND` | Choose `vertex` or `ollama` | `vertex` |
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID | (required for vertex) |
+| `GOOGLE_LOCATION` | GCP region | `us-central1` |
+| `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
+| `OLLAMA_BASE_URL` | Ollama API endpoint | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama model name | `qwen2.5-coder:14b` |
+| `AI_SAST_SEVERITY` | PR comment severity filter | `critical,high` |
+| `AI_SAST_EXCLUDE_PATHS` | Additional exclusion patterns | - |
+| `AI_SAST_CUSTOM_PROMPT` | Append to scanning prompt | - |
+| `AI_SAST_DB_PATH` | SQLite database location | `~/.ai-sast/scans.db` |
+
+### File Configuration
+
+**`ai-sast-extensions.txt`**
+- Defines supported file types for scanning
+- One pattern per line (e.g., `*.py`, `*.js`)
+- Easily customizable by users
+
+**`prompts/default_prompt.txt`**
+- Base security scanning prompt sent to LLM
+- Includes instructions for JSON formatting
+- Users can append custom instructions via `AI_SAST_CUSTOM_PROMPT`
+
+## Security Considerations
+
+### Authentication
+- **Local Development:** `gcloud auth application-default login`
+- **GitHub Actions:** Service account JSON via `GOOGLE_TOKEN` secret
+- **Ollama:** No authentication (local only)
+
+### Secrets Management
+- All sensitive data in environment variables
+- GitHub Secrets for CI/CD
+- No hardcoded credentials
+- Gitleaks integrated for secret detection
+
+### Rate Limiting
+- Exponential backoff (3^attempt seconds)
+- Configurable max workers (`--max-workers`)
+- Sleep delays between parallel file processing
+- Recommended: `--max-workers 1` for full scans
+
+## Deployment Options
+
+### Local Development
 ```bash
+# Vertex AI
+export LLM_BACKEND="vertex"
+export GOOGLE_CLOUD_PROJECT="my-project"
+gcloud auth application-default login
+python -m src.main.pr_scan
+
+# Ollama
 export LLM_BACKEND="ollama"
-export OLLAMA_MODEL="qwen2.5-coder:14b"
+ollama serve
+python -m src.main.pr_scan
 ```
 
-## Security & Privacy
+### GitHub Actions (CI/CD)
+- Secrets configured in repository settings
+- Workflows run on `ubuntu-latest`
+- Artifacts stored for 30 days
+- PR comments posted automatically
 
-### Vertex AI
-- Code sent to Google Cloud
-- Encrypted in transit and at rest
-- Processed in specified region
-- Not used for Google model training
-
-### Ollama
-- 100% local processing
-- Code never leaves your machine
-- Full control over data
-- Open-source models
+### Webhook Listener (Optional)
+- Docker container on AWS ECS
+- Terraform infrastructure in `webhook/iac/`
+- API Gateway + Load Balancer
+- Auto-scaling based on traffic
 
 ## Performance
 
-### Typical Scan Times
+### Scanning Speed
+- **PR Scan:** ~5-30 seconds (depends on changed files)
+- **Full Scan:** Minutes to hours (depends on codebase size)
+- **Bottleneck:** LLM API calls (rate limits)
 
-| Scan Type | Files | Vertex AI | Ollama (14B) |
-|-----------|-------|-----------|--------------|
-| PR Scan | 1-5 | 10-30s | 1-3 min |
-| PR Scan | 10-20 | 30-60s | 3-7 min |
-| Full Scan | 100 | 5-10 min | 15-45 min |
+### Optimization Strategies
+1. **Sequential scanning:** `--max-workers 1` (avoids rate limits)
+2. **Exclusion patterns:** Skip test files, dependencies
+3. **File type filtering:** Only scan relevant languages
+4. **Local LLMs:** Ollama for unlimited requests
+5. **Smaller models:** Use `qwen2.5-coder:7b` for faster inference
 
-**Note:** Ollama times vary with hardware (faster with GPU).
+## Extensibility
 
-### Rate Limiting
-
-**Vertex AI:**
-- Subject to GCP quotas
-- Mitigated with exponential backoff
-- Use `--max-workers 1` if needed
-
-**Ollama:**
-- No rate limits
-- Limited by local hardware
-- Scale by adding more RAM/GPU
-
-## Extension Points
+### Adding New LLM Backends
+1. Create client class in `src/integrations/`
+2. Implement `generate()` method
+3. Add to `src/core/scanner.py` backend selection
+4. Update configuration documentation
 
 ### Custom Prompts
+- Modify `prompts/default_prompt.txt` for base changes
+- Use `AI_SAST_CUSTOM_PROMPT` for runtime additions
+- Format: Append to base prompt with newline
+
+### Additional Integrations
+- **Jira:** Uncomment in `requirements.txt`, set env vars
+- **Databricks:** Uncomment in `requirements.txt`, configure credentials
+- **Notifications:** Set webhook URLs for Slack/Teams/Discord
+
+## Monitoring & Debugging
+
+### Logs
+- Verbose output to stdout/stderr
+- GitHub Actions logs available in workflow runs
+- Webhook logs in CloudWatch (if deployed on AWS)
+
+### Debugging
 ```bash
-export AI_SAST_CUSTOM_PROMPT="Focus on OWASP Top 10"
+# Enable verbose logging
+export LOG_LEVEL="DEBUG"
+
+# Test specific file
+python -m src.core.scanner --file path/to/file.py
+
+# Check database
+sqlite3 ~/.ai-sast/scans.db "SELECT * FROM scan_results LIMIT 5;"
 ```
 
-### File Exclusions
-```bash
-export AI_SAST_EXCLUDE_PATHS="dist,build,vendor"
-```
+## Future Enhancements
 
-### Supported Languages
-Configured in `ai-sast-extensions.txt`:
-- Python, JavaScript/TypeScript, Java, C/C++, Go, Rust
-- PHP, Ruby, C#, Kotlin, Swift, Scala
-- SQL, Shell, Lua, Perl, R
-- And more...
-
-## Integrations
-
-### Built-in
-- **SQLite**: Default storage (no setup)
-- **GitHub Actions**: PR comments and workflows
-
-### Optional
-- **Databricks**: Enterprise feedback storage
-- **Jira**: Import known vulnerability patterns
-- **Slack/Teams/Discord**: Webhook notifications
-- **Vector**: Log aggregation
-
-See [INTEGRATIONS.md](../INTEGRATIONS.md) for setup details.
-
-## Development
-
-### Project Structure
-```
-ai-sast/
-├── src/
-│   ├── core/           # Scanner, vertex client, report generator
-│   ├── integrations/   # Ollama, database, jira, notifications
-│   └── main/           # Entry points (pr_scan, full_scan)
-├── .github/workflows/  # GitHub Actions
-├── webhook/            # Feedback webhook listener
-├── examples/           # Usage examples
-└── docs/              # This file + CONFIGURATION.md
-```
-
-### Key Files
-- `src/core/scanner.py` - Main scanning engine
-- `src/core/report.py` - Report generation
-- `src/core/config.py` - Configuration
-- `src/integrations/ollama.py` - Ollama client
-- `src/integrations/scan_database.py` - SQLite storage
-
-## Summary
-
-**Core workflow:**
-1. GitHub triggers scan on PR/push
-2. Scanner analyzes code with AI (Vertex or Ollama)
-3. Findings posted as PR comment (filtered by severity)
-4. Full report uploaded as artifact
-5. Developer provides feedback via checkboxes
-6. Webhook captures feedback → stores in database
-7. Future scans use feedback for improved accuracy
-
-**Two deployment options:**
-- **Cloud (Vertex AI)**: Fast, scalable, production-ready
-- **Local (Ollama)**: Private, free, self-hosted
-
-**Minimal maintenance:**
-- SQLite database auto-creates
-- No external services required (except LLM)
-- Optional integrations for enterprise needs
-
-For configuration details, see [CONFIGURATION.md](CONFIGURATION.md).
+- [ ] Parallel file scanning with intelligent rate limiting
+- [ ] Machine learning model to reduce false positives
+- [ ] Support for additional LLM providers (Claude, GPT-4)
+- [ ] SARIF format export for GitHub Code Scanning
+- [ ] Real-time vulnerability trend analysis

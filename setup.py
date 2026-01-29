@@ -105,7 +105,7 @@ def create_env_file():
     
     env_content = f"""# Google Cloud Project Configuration
 GOOGLE_CLOUD_PROJECT={project_id}
-VERTEX_AI_LOCATION={location}
+GOOGLE_LOCATION={location}
 
 # Authentication (optional - if not using gcloud auth)
 # GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
