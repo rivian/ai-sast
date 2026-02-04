@@ -77,8 +77,8 @@ AI-SAST is an AI-powered static application security testing tool that combines 
                                                   │
                                                   ▼
                                     ┌─────────────────────────┐
-                                    │  GitHub Webhook         │
-                                    │  (Optional)             │
+                                    │  Feedback Collection    │
+                                    │  (GitHub Actions)       │
                                     └─────────────┬───────────┘
                                                   │
                                                   ▼
@@ -142,11 +142,10 @@ AI-SAST is an AI-powered static application security testing tool that combines 
   - `scan_results` table: Initial findings with vuln_id
   - `feedback` table: Developer feedback (true/false positive)
 
-#### Webhook Listener (`webhook/main.py`)
-- **Framework:** Flask
-- **Trigger:** GitHub issue_comment events
-- **Action:** Parse checkbox changes, store feedback
-- **Deployment:** Docker + ECS (Terraform in `webhook/iac/`)
+#### Feedback Collection (`.github/workflows/collect-feedback.yml`)
+- **Trigger:** GitHub issue_comment events (PR comments)
+- **Action:** Parse checkbox changes, store feedback in SQLite
+- **Deployment:** Runs automatically in GitHub Actions
 
 ### 5. GitHub Actions Workflows
 
@@ -200,25 +199,17 @@ Developer creates PR
 ```
 Developer reviews PR comment
     │
-    ├─> Clicks "Edit" on comment
-    │
     ├─> Checks ☑ True Positive or ☑ False Positive
     │
     ├─> Saves comment
     │
-    ├─> GitHub sends webhook event
+    ├─> GitHub Actions workflow triggered
     │
-    ├─> Webhook listener receives event
+    ├─> Extract vuln_id and parse checkbox state
     │
-    ├─> Extract vuln_id from hidden HTML comment
+    ├─> Store feedback in SQLite (or Databricks)
     │
-    ├─> Parse checkbox state
-    │
-    ├─> Store feedback:
-    │   ├─> SQLite (default)
-    │   └─> Databricks (if configured)
-    │
-    └─> Future scans can reference this feedback
+    └─> Future scans include this feedback
 ```
 
 ## Configuration
@@ -289,13 +280,7 @@ python -m src.main.pr_scan
 - Secrets configured in repository settings
 - Workflows run on `ubuntu-latest`
 - Artifacts stored for 30 days
-- PR comments posted automatically
-
-### Webhook Listener (Optional)
-- Docker container on AWS ECS
-- Terraform infrastructure in `webhook/iac/`
-- API Gateway + Load Balancer
-- Auto-scaling based on traffic
+- PR comments and feedback collection automated
 
 ## Performance
 
@@ -329,14 +314,8 @@ python -m src.main.pr_scan
 - **Databricks:** Uncomment in `requirements.txt`, configure credentials
 - **Notifications:** Set webhook URLs for Slack/Teams/Discord
 
-## Monitoring & Debugging
+## Debugging
 
-### Logs
-- Verbose output to stdout/stderr
-- GitHub Actions logs available in workflow runs
-- Webhook logs in CloudWatch (if deployed on AWS)
-
-### Debugging
 ```bash
 # Enable verbose logging
 export LOG_LEVEL="DEBUG"
@@ -347,11 +326,3 @@ python -m src.core.scanner --file path/to/file.py
 # Check database
 sqlite3 ~/.ai-sast/scans.db "SELECT * FROM scan_results LIMIT 5;"
 ```
-
-## Future Enhancements
-
-- [ ] Parallel file scanning with intelligent rate limiting
-- [ ] Machine learning model to reduce false positives
-- [ ] Support for additional LLM providers (Claude, GPT-4)
-- [ ] SARIF format export for GitHub Code Scanning
-- [ ] Real-time vulnerability trend analysis

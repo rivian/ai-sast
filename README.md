@@ -35,7 +35,7 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 3. **Results**: Get HTML reports and PR comments with findings
 4. **Feedback Loop** (Optional): Developers mark findings as true/false positives for continuous improvement
 
-📖 **For detailed architecture**, see the [Wiki - Architecture](../../wiki/Architecture-Overview)
+📖 **For detailed architecture**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 🚀 Quick Start
 
@@ -85,7 +85,7 @@ python examples/ollama_scan.py
 
 **Benefits:** Free, private, offline, no rate limits
 
-📚 **Detailed Ollama guide:** [Wiki - Ollama Setup](../../wiki/Ollama-Setup)
+📚 **Detailed Ollama guide:** [docs/OLLAMA.md](docs/OLLAMA.md)
 
 ---
 
@@ -123,7 +123,7 @@ python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
 
 Developers can mark findings as true/false positives to improve accuracy over time. Feedback is automatically stored in SQLite.
 
-📚 **Setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
+📚 **Setup guide:** [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
 
 ---
 
@@ -182,7 +182,7 @@ export AI_SAST_CUSTOM_PROMPT="Focus on authentication vulnerabilities"
 
 **For customization options (severity, exclusions, prompts)**, see "💡 Highly Recommended" section above.
 
-**For feedback loop setup**, see the [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
+**For feedback loop setup**, see [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
 
 ---
 
@@ -222,7 +222,7 @@ The feedback workflow is already configured! When developers check boxes in PR c
 - ✅ Avoid similar false positives
 - ✅ Be more vigilant about confirmed patterns
 
-📖 **Complete guide**: [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
+📖 **Complete guide**: [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
 
 ---
 
@@ -287,7 +287,7 @@ This project follows OWASP security guidelines:
 
 - 🐛 **Issues**: [Report bugs](../../issues)
 - 💬 **Discussions**: [Ask questions](../../discussions)
-- 📖 **Documentation**: [Browse the Wiki](../../wiki)
+- 📖 **Documentation**: Browse the [docs/](docs/) folder
 
 ---
 

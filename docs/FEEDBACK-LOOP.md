@@ -456,20 +456,7 @@ rm ~/.ai-sast/scans.db
 3. ✅ **Export feedback** periodically for analysis
 4. ✅ **Train developers** on using the feedback system
 
-## Future Enhancements
-
-Potential improvements to the feedback system:
-
-- [ ] Web dashboard for feedback analytics
-- [ ] Export feedback to CSV/JSON
-- [ ] Integration with JIRA for confirmed vulnerabilities
-- [ ] ML-based false positive prediction
-- [ ] Team-level feedback aggregation
-- [ ] Feedback quality scoring
-- [ ] Automated regression testing based on feedback
-
 ## See Also
 
 - [Architecture Documentation](ARCHITECTURE.md)
-- [Webhook Integration](WEBHOOKS.md)
 - [Contributing Guide](../CONTRIBUTING.md)

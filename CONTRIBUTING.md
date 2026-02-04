@@ -194,9 +194,18 @@ Fixes #123
 ## Documentation
 
 * **Update the README.md** if you change functionality
+* **Update docs/** files for user-facing documentation changes
 * **Add docstrings** to all public functions and classes
 * **Include examples** in docstrings where helpful
-* **Update the changelog** for notable changes
+
+### Documentation Files
+
+User-facing documentation is in the `docs/` folder:
+- `docs/ARCHITECTURE.md` - System architecture and design
+- `docs/FEEDBACK-LOOP.md` - Feedback system documentation
+- `docs/OLLAMA.md` - Local LLM setup guide
+
+Update these files when adding features or changing behavior.
 
 ## Project Structure
 
@@ -208,12 +217,17 @@ ai-sast/
 │   │   ├── vertex.py   # Vertex AI integration
 │   │   ├── report.py   # Report generation
 │   │   └── config.py   # Configuration management
-│   └── __init__.py
+│   └── integrations/   # External integrations
 ├── tests/              # Test files
 ├── examples/           # Example scripts
+├── docs/               # Documentation
+│   ├── ARCHITECTURE.md
+│   ├── FEEDBACK-LOOP.md
+│   ├── OLLAMA.md
+│   └── images/
 ├── .github/
 │   └── workflows/      # GitHub Actions workflows
-└── docs/               # Additional documentation
+└── prompts/            # AI prompts
 ```
 
 ## Review Process
