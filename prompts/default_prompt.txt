@@ -39,14 +39,35 @@ Code:
 - Identify which imported functions likely receive the traced data
 - Specify which additional files would need to be analyzed to confirm exploitability
 
+## Severity Assessment Guidelines:
+
+When assessing the severity of a vulnerability, consider the **likelihood of exploitation** based on attack prerequisites:
+
+**CRITICAL/HIGH severity is appropriate when:**
+- The vulnerability is exploitable by an unauthenticated external attacker
+- The vulnerability requires minimal or no privileges
+- User input is directly controllable through normal application interfaces
+
+**MEDIUM severity is appropriate when:**
+- The vulnerability requires authenticated access but not elevated privileges
+- The attack surface is moderately restricted
+
+**LOW severity is appropriate when:**
+- **The attacker must have privileged/administrative access to the system** (e.g., ability to trigger DAGs, modify job parameters, access admin panels)
+- **The attacker must control environment variables or deployment configuration** (e.g., ability to modify CI/CD pipelines, container configurations, or server environment)
+- **The vulnerability exists in internal tools or scripts that require elevated permissions to execute**
+- The vulnerability is in templating systems (Jinja2, Airflow DAGs, etc.) where parameters are controlled by privileged operators
+
+**Key principle**: If successful exploitation requires the attacker to already have significant access to the system (admin privileges, infrastructure access, ability to modify deployments), the severity should be LOW or MEDIUM, not CRITICAL or HIGH. The reasoning is that an attacker with such access already has significant capabilities and the SQL injection or similar vulnerability represents a marginal increase in risk.
+
 ## Response Format:
 
 Format your response for each finding as:
 - **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
 - **Issue**: Brief description of the vulnerability.
 - **Location**: File name which the vulnerability exists and any associated file names which are involved in the vulnerability. If not applicable, use "N/A".
-- **CVSS Vector**: The full CVSS v3.1 vector string (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H").
-- **Risk**: A brief explanation of the security impact.
+- **CVSS Vector**: The full CVSS v3.1 vector string (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"). Ensure the Privileges Required (PR) metric accurately reflects the access level needed for exploitation.
+- **Risk**: A brief explanation of the security impact, including specific mention of the attack prerequisites (e.g., "Requires attacker to have privileged access to trigger DAG with custom parameters").
 - **Fix**: Specific remediation steps, including a secure code example.
 
 
