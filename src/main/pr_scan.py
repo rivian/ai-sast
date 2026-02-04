@@ -213,6 +213,10 @@ def main():
     # Example: "pull_request", "push", "workflow_dispatch"
     github_event_name = os.environ.get('GITHUB_EVENT_NAME', '')
     
+    # GITHUB_EVENT_PATH: Path to event payload file
+    # Example: "/home/runner/work/_temp/_github_workflow/event.json"
+    github_event_path = os.environ.get('GITHUB_EVENT_PATH', '')
+    
     repo_url = f"https://github.com/{github_repository}" if github_repository else ""
     
     print("=" * 60)
