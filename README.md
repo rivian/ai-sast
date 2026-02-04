@@ -313,57 +313,6 @@ AI-SAST generates reports with the following information for each vulnerability:
 - **Fix**: Use parameterized queries instead of string concatenation...
 ```
 
-## 🏗️ Project Structure
-
-```
-ai-sast/
-├── src/
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py          # Configuration management
-│   │   ├── scanner.py         # Main security scanner
-│   │   ├── vertex.py          # Vertex AI client
-│   │   └── report.py          # Report generation
-│   ├── integrations/          # Optional integrations
-│   │   ├── __init__.py
-│   │   ├── jira.py            # Jira integration
-│   │   ├── databricks.py      # Databricks integration
-│   │   ├── vector.py          # Vector/log aggregation
-│   │   └── notifications.py   # Slack/Teams/Discord notifications
-│   └── main/
-│       ├── __init__.py
-│       ├── full_scan.py       # Full repository scan (CI/CD)
-│       └── pr_scan.py         # Pull request diff scan (CI/CD)
-├── .github/
-│   └── workflows/
-│       ├── pr-scan.yml            # PR scanning workflow
-│       ├── full-scan.yml          # Full repository scan
-│       └── collect-feedback.yml   # Feedback collection
-├── prompts/
-│   └── default_prompt.txt     # Default AI scanning prompt
-├── docs/
-│   ├── ARCHITECTURE.md                 # System architecture
-│   ├── OLLAMA.md                       # Ollama setup guide
-│   ├── FEEDBACK-LOOP.md                # Feedback loop guide
-│   ├── OPTIONAL-FINDINGS-STORAGE.md    # Optional storage feature
-│   └── images/
-│       └── architecture.png            # Architecture diagram
-├── wiki/                               # GitHub Wiki content (publish to wiki)
-│   ├── README.md                       # Wiki setup instructions
-│   ├── Home.md                         # Wiki home page
-│   ├── Installation-and-Setup.md       # Setup guide
-│   └── Feedback-Loop.md                # Feedback documentation
-├── examples/                           # Example usage scripts
-├── tests/                              # Unit tests
-├── .gitleaks.toml            # Gitleaks configuration
-├── requirements.txt           # Python dependencies
-├── setup.py                   # Setup script
-├── LICENSE                    # Apache License 2.0
-├── CONTRIBUTING.md            # Contribution guidelines
-└── README.md                  # This file
-```
-
 ## 🔒 Security Best Practices
 
 This project follows OWASP security guidelines:
