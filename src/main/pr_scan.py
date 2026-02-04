@@ -115,6 +115,84 @@ def _generate_vuln_id(file_path: str, issue: str, location: str) -> str:
     return hashlib.sha1(unique_string.encode()).hexdigest()[:8]
 
 
+def _store_scan_findings(scan_results: List[Dict], repo_url: str, pr_number: Optional[int], scan_id: str):
+    """
+    Store scan findings in database if AI_SAST_STORE_FINDINGS is enabled.
+    
+    Args:
+        scan_results: List of scan result dictionaries
+        repo_url: Repository URL
+        pr_number: Pull request number (optional)
+        scan_id: Unique identifier for this scan
+    """
+    # Check if storage is enabled (default: false)
+    store_findings = os.environ.get('AI_SAST_STORE_FINDINGS', 'false').lower() in ['true', '1', 'yes']
+    
+    if not store_findings:
+        return
+    
+    try:
+        from ..integrations.scan_database import ScanDatabase
+        
+        print(f"\n💾 Storing scan findings in database (AI_SAST_STORE_FINDINGS=true)...")
+        db = ScanDatabase()
+        
+        stored_count = 0
+        for result in scan_results:
+            file_path = result.get('file_path', 'unknown')
+            analysis = result.get('analysis', '')
+            
+            # Parse vulnerabilities from analysis
+            import re
+            vuln_pattern = re.compile(
+                r"-\s*\*\*Vulnerability Level\*\*:\s*(CRITICAL|HIGH|MEDIUM|LOW|INFO)\s*\n"
+                r"-\s*\*\*Issue\*\*:\s*(.*?)\n"
+                r"-\s*\*\*Location\*\*:\s*(.*?)\n"
+                r"(?:-\s*\*\*CVSS Vector\*\*:\s*(.*?)\n)?"
+                r"-\s*\*\*Risk\*\*:\s*(.*?)\n"
+                r"-\s*\*\*Fix\*\*:\s*(.*?)(?:\n-|\n\n|$)",
+                re.DOTALL | re.IGNORECASE
+            )
+            
+            for match in vuln_pattern.finditer(analysis):
+                severity = match.group(1).strip()
+                issue = match.group(2).strip()
+                location = match.group(3).strip()
+                cvss_vector = match.group(4).strip() if match.group(4) else None
+                risk = match.group(5).strip()
+                fix = match.group(6).strip()
+                
+                # Generate vulnerability ID
+                vuln_id = _generate_vuln_id(file_path, issue, location)
+                
+                # Store in database
+                success = db.store_scan_result(
+                    scan_id=scan_id,
+                    repo_url=repo_url,
+                    pr_number=pr_number,
+                    file_path=file_path,
+                    vulnerability_id=vuln_id,
+                    issue=issue,
+                    severity=severity,
+                    cvss_vector=cvss_vector,
+                    location=location,
+                    description=risk,
+                    risk=risk,
+                    fix=fix,
+                    scan_type="pr"
+                )
+                
+                if success:
+                    stored_count += 1
+        
+        db.close()
+        print(f"✅ Stored {stored_count} finding(s) in database")
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not store findings in database: {e}")
+        # Don't fail the scan if storage fails
+
+
 def main():
     """Main function to run security scan on PR diffs."""
     
@@ -236,11 +314,24 @@ def main():
 
     # Generate reports
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    scan_id = f"pr-{github_sha[:7] if github_sha else 'unknown'}-{timestamp}"
     
     if not scan_results:
         print("✅ No new code changes to scan (or all files excluded).")
         print("PR scan completed successfully!")
         return
+    
+    # Store scan findings in database (if enabled)
+    pr_number = None
+    if github_event_path and os.path.exists(github_event_path):
+        try:
+            with open(github_event_path, 'r') as f:
+                event = json.load(f)
+            pr_number = event.get('pull_request', {}).get('number') or event.get('number')
+        except:
+            pass
+    
+    _store_scan_findings(scan_results, repo_url, pr_number, scan_id)
 
     # Generate HTML report
     html_report_file = f'ai_sast_pr_scan_report_{timestamp}.html'
