@@ -196,6 +196,7 @@ This context helps the AI:
 |----------|----------|---------|-------------|
 | `AI_SAST_FEEDBACK_BACKEND` | No | `auto` | Backend selection: `sqlite`, `databricks`, or `auto` |
 | `AI_SAST_DB_PATH` | No | `~/.ai-sast/scans.db` | SQLite database path |
+| `AI_SAST_STORE_FINDINGS` | No | `false` | Store scan findings in database (set to `true` to enable) |
 | `AI_SAST_DATABRICKS_HOST` | For Databricks | - | Databricks workspace hostname |
 | `AI_SAST_DATABRICKS_HTTP_PATH` | For Databricks | - | SQL warehouse HTTP path |
 | `AI_SAST_DATABRICKS_TOKEN` | For Databricks | - | Personal access token |
@@ -203,17 +204,40 @@ This context helps the AI:
 | `AI_SAST_DATABRICKS_SCHEMA` | For Databricks | - | Schema name |
 | `AI_SAST_DATABRICKS_TABLE` | For Databricks | - | Table name |
 
+### Storing Scan Findings (Optional)
+
+By default, only **feedback** is stored in the database to keep it lightweight. If you want to also store the **original scan findings** (for analytics, tracking, etc.), set:
+
+```bash
+export AI_SAST_STORE_FINDINGS=true
+```
+
+**When to enable:**
+- ✅ You want to track all vulnerabilities found over time
+- ✅ You need analytics on vulnerability trends
+- ✅ You want to calculate false positive rates
+- ✅ You want historical records of all scans
+
+**When to keep disabled (default):**
+- ✅ You only care about feedback for improving accuracy
+- ✅ You want to minimize database size
+- ✅ Findings are already visible in PR comments/reports
+
 ### Backend Selection Logic
 
 1. If `AI_SAST_FEEDBACK_BACKEND=databricks` → Use Databricks
 2. Else if all Databricks variables are set → Use Databricks
 3. Otherwise → Use SQLite (default)
 
-## Database Schema
+## 📊 Database Schema
 
 ### SQLite Tables
 
-#### `feedback` Table
+The database has two main tables:
+
+#### `feedback` Table (Always Used)
+Stores developer feedback on security findings. This is the core of the feedback loop.
+
 ```sql
 CREATE TABLE feedback (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,7 +258,9 @@ CREATE TABLE feedback (
 );
 ```
 
-#### `scan_results` Table
+#### `scan_results` Table (Optional - Only if `AI_SAST_STORE_FINDINGS=true`)
+Stores original scan findings for analytics and tracking.
+
 ```sql
 CREATE TABLE scan_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -251,11 +277,13 @@ CREATE TABLE scan_results (
     description TEXT,
     risk TEXT,
     fix TEXT,
-    scan_type TEXT,
+    scan_type TEXT,                 -- 'pr' or 'full'
     created_at TEXT NOT NULL,
     UNIQUE(repository, vuln_id, scan_id)
 );
 ```
+
+**Note:** The `scan_results` table is only populated when `AI_SAST_STORE_FINDINGS=true` is set.
 
 ## API Reference
 

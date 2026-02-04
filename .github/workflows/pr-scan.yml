@@ -31,6 +31,8 @@ jobs:
       GOOGLE_LOCATION: us-central1
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
       AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
+      # Optional: Store scan findings in database for analytics (default: false)
+      # AI_SAST_STORE_FINDINGS: ${{ vars.AI_SAST_STORE_FINDINGS || 'false' }}
     
     steps:
       - name: Checkout code

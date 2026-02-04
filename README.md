@@ -37,7 +37,7 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 3. **Results**: Get HTML reports and PR comments with findings
 4. **Feedback Loop** (Optional): Developers mark findings as true/false positives for continuous improvement
 
-📖 **For detailed architecture**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+📖 **For detailed architecture**, see the [Wiki - Architecture](../../wiki/Architecture-Overview)
 
 ## 🚀 Quick Start
 
@@ -87,7 +87,7 @@ python examples/ollama_scan.py
 
 **Benefits:** Free, private, offline, no rate limits
 
-📚 **Detailed Ollama guide:** [docs/OLLAMA.md](docs/OLLAMA.md)
+📚 **Detailed Ollama guide:** [Wiki - Ollama Setup](../../wiki/Ollama-Setup)
 
 ---
 
@@ -121,11 +121,11 @@ python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
 
 **That's it!** Results appear as PR comments and artifacts.
 
-### Optional: Feedback Loop & Webhooks
+### Optional: Feedback Loop
 
-Developers can mark findings as true/false positives to improve accuracy over time.
+Developers can mark findings as true/false positives to improve accuracy over time. Feedback is automatically stored in SQLite when developers check boxes in PR comments.
 
-📚 **Setup guide:** [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
+📚 **Setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
 ---
 
@@ -174,7 +174,7 @@ export DATABRICKS_ACCESS_TOKEN="your-access-token"
 - System learns from feedback to reduce false positives
 - Accuracy improves continuously with each scan
 
-📚 **Full setup guide:** [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
+📚 **Full setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
 ### Customization (Fine-tune Scanning)
 
@@ -228,12 +228,13 @@ export AI_SAST_CUSTOM_PROMPT="Focus on authentication and SQL injection vulnerab
 | `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
 | `LLM_BACKEND` | `vertex` or `ollama` | `vertex` |
 | `OLLAMA_MODEL` | Ollama model (if using Ollama) | `qwen2.5-coder:14b` |
+| `AI_SAST_STORE_FINDINGS` | Store scan findings in DB | `false` |
+
+**Note on `AI_SAST_STORE_FINDINGS`:** Set to `true` to store all scan findings in the database for analytics. By default, only feedback is stored to keep the database lightweight.
 
 **For customization options (severity, exclusions, prompts)**, see "💡 Highly Recommended" section above.
 
-**For webhook/enterprise features**, see [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
-
-**For feedback loop setup**, see [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
+**For feedback loop setup**, see the [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
 ---
 
@@ -273,7 +274,7 @@ The feedback workflow is already configured! When developers check boxes in PR c
 - ✅ Avoid similar false positives
 - ✅ Be more vigilant about confirmed patterns
 
-📖 **Complete guide**: [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
+📖 **Complete guide**: [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
 ---
 
@@ -334,29 +335,27 @@ ai-sast/
 │       ├── __init__.py
 │       ├── full_scan.py       # Full repository scan (CI/CD)
 │       └── pr_scan.py         # Pull request diff scan (CI/CD)
-├── webhook/                   # Webhook listener for feedback
-│   ├── main.py               # Flask webhook application
-│   ├── Dockerfile            # Container image
-│   ├── requirements.txt      # Python dependencies
-│   ├── README.md            # Webhook setup guide
-│   └── iac/                 # Terraform infrastructure
-│       ├── main.tf
-│       ├── variables.tf
-│       └── modules/         # Terraform modules
 ├── .github/
 │   └── workflows/
-│       └── security-scan.yml  # GitHub Actions workflow with Gitleaks
+│       ├── pr-scan.yml            # PR scanning workflow
+│       ├── full-scan.yml          # Full repository scan
+│       └── collect-feedback.yml   # Feedback collection
 ├── prompts/
 │   └── default_prompt.txt     # Default AI scanning prompt
 ├── docs/
-│   ├── ARCHITECTURE.md        # System architecture
-│   ├── OLLAMA.md              # Ollama setup guide
-│   ├── WEBHOOKS.md            # Webhook integration
-│   ├── FEEDBACK-LOOP.md       # Feedback loop guide
+│   ├── ARCHITECTURE.md                 # System architecture
+│   ├── OLLAMA.md                       # Ollama setup guide
+│   ├── FEEDBACK-LOOP.md                # Feedback loop guide
+│   ├── OPTIONAL-FINDINGS-STORAGE.md    # Optional storage feature
 │   └── images/
-│       └── architecture.png   # Architecture diagram
-├── examples/                  # Example usage scripts
-├── tests/                     # Unit tests
+│       └── architecture.png            # Architecture diagram
+├── wiki/                               # GitHub Wiki content (publish to wiki)
+│   ├── README.md                       # Wiki setup instructions
+│   ├── Home.md                         # Wiki home page
+│   ├── Installation-and-Setup.md       # Setup guide
+│   └── Feedback-Loop.md                # Feedback documentation
+├── examples/                           # Example usage scripts
+├── tests/                              # Unit tests
 ├── .gitleaks.toml            # Gitleaks configuration
 ├── requirements.txt           # Python dependencies
 ├── setup.py                   # Setup script
@@ -422,9 +421,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 📧 Support
 
-- 🐛 Issues: [GitHub Issues](https://github.com/YOUR_USERNAME/ai-sast/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/YOUR_USERNAME/ai-sast/discussions)
-- 📖 Documentation: [Wiki](https://github.com/YOUR_USERNAME/ai-sast/wiki)
+- 🐛 **Issues**: Report bugs or request features in the [Issues](../../issues) tab
+- 💬 **Discussions**: Ask questions in the [Discussions](../../discussions) tab
+- 📖 **Documentation**: Browse the [Wiki](../../wiki) for detailed guides
 
 ## 🗺️ Roadmap
 
