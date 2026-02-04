@@ -17,9 +17,10 @@ AI-SAST is a powerful, AI-driven static application security testing tool that s
 - 🌐 **Multi-Language Support**: Supports Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, and more (see `ai-sast-extensions.txt`)
 - 🎯 **Smart Filtering**: Configurable exclusion patterns to focus on relevant code
 - 📊 **CVSS Scoring**: Provides CVSS v3.1 vector strings for vulnerabilities
-- 💾 **Local Database**: Built-in SQLite for storing scan results and feedback (no external services required)
+- 💾 **Feedback Loop**: Built-in SQLite for storing scan results and feedback (no external services required)
 - 🔒 **Privacy Options**: Keep your code on-premise with Ollama backend
-- 🔌 **Optional Integrations**: Jira, Databricks, and Vector/Log aggregation support for enterprise deployments
+- 🎯 **Context-Aware**: Jira integration provides LLM with historical vulnerability patterns for improved accuracy
+- 🔌 **Enterprise Ready**: Optional Databricks/Vector storage for organization-wide learning and analytics
 
 ## 🏛️ Architecture
 
@@ -27,226 +28,47 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 
 ![AI-SAST Architecture](docs/images/architecture.png)
 
-> 📝 **Note**: Please save the architecture diagram image as `docs/images/architecture.png` in the repository.
-
 ### How It Works
 
-1. **GitHub Integration**: Pull requests trigger automated scans via GitHub Actions
-2. **AI-Powered Analysis**: Code is analyzed by Google Vertex AI (Gemini) for security vulnerabilities
-3. **Context-Aware Scanning**: 
-   - **Local Database**: Scan results and feedback stored in SQLite for continuous learning
-   - Jira integration for known vulnerability patterns (optional)
-   - Databricks for enterprise multi-team deployments (optional)
-4. **Smart Scanning Modes**:
-   - **PR Diff Scanning**: Fast, targeted scanning of only changed files
-   - **Full Repository Scanning**: Comprehensive scan of entire codebase on main branch
-5. **Results & Reporting**:
-   - HTML reports with detailed findings and CVSS scoring
-   - PR comments with critical/high severity issues and interactive feedback checkboxes
-   - Webhook notifications (Slack, Teams, Discord, generic)
-   - Metrics and trends for security posture tracking
-6. **Feedback Loop**:
-   - Interactive checkboxes in PR comments
-   - Automatic storage in local SQLite database
-   - Databricks option for enterprise deployments
-   - Reduces false positives over time
+1. **Scan Trigger**: Pull requests or manual triggers start a scan
+2. **AI Analysis**: Code is analyzed by Vertex AI (Gemini) or Ollama for vulnerabilities
+3. **Results**: Get HTML reports and PR comments with findings
+4. **Feedback Loop** (Optional): Developers mark findings as true/false positives for continuous improvement
 
-📖 **For detailed architecture**, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+📖 **For detailed architecture**, see the [Wiki - Architecture](../../wiki/Architecture-Overview)
 
 ## 🚀 Quick Start
 
-### Choose Your LLM Backend
+### Vertex AI (Cloud) - Recommended for CI/CD
 
-AI-SAST supports two backends:
+**Prerequisites:**
+- Python 3.8+
+- Google Cloud account with Vertex AI API enabled
 
-| Backend | Best For | Setup |
-|---------|----------|-------|
-| **Vertex AI** | Production, cloud, teams | Requires Google Cloud account |
-| **Ollama** | Local, privacy, cost-free | Runs on your machine |
-
-<details>
-<summary><b>Option 1: Vertex AI (Cloud)</b></summary>
-
-#### Prerequisites
-- Python 3.8 or higher
-- Google Cloud Platform account with Vertex AI API enabled
-- Google Cloud CLI (optional, for easier authentication)
-
-#### Setup
+**Setup:**
 ```bash
 # Install dependencies
-python setup.py
-
-# Configure
-export LLM_BACKEND="vertex"
-export GOOGLE_CLOUD_PROJECT="your-project-id"
-export GOOGLE_LOCATION="us-central1"
-export GEMINI_MODEL="gemini-2.0-flash-exp"  # or gemini-2.5-pro
-```
-
-See full Vertex AI setup below.
-</details>
-
-<details>
-<summary><b>Option 2: Ollama (Local/Open-Source) ⭐ New!</b></summary>
-
-#### Prerequisites
-- Python 3.8 or higher
-- [Ollama](https://ollama.com/) installed locally
-
-#### Setup
-```bash
-# Install Ollama (Mac/Linux)
-curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull a code model
-ollama pull qwen2.5-coder:14b
-
-# Start Ollama (if not auto-started)
-ollama serve
-
-# Install AI-SAST dependencies
 pip install -r requirements.txt
 
-# Configure
-export LLM_BACKEND="ollama"
-export OLLAMA_MODEL="qwen2.5-coder:14b"
-export OLLAMA_BASE_URL="http://localhost:11434"
+# Configure (only 2 required variables!)
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_TOKEN="your-service-account-json"
 
-# Run example
-python examples/ollama_scan.py
+# Run a scan
+python -m src.main.pr_scan
 ```
 
-**Recommended Models for Security Scanning:**
-- `qwen2.5-coder:14b` - **Recommended** - Best balance (8GB RAM)
-- `qwen2.5-coder:7b` - Fast, code-focused (4GB RAM)
-- `qwen2.5-coder:32b` - Most accurate (20GB RAM)
-- `codellama:13b` - Meta's code model (8GB RAM)
-- `llama3.1:8b` - Latest Llama (5GB RAM)
-- `deepseek-coder:33b` - Alternative, very capable (20GB RAM)
+**For GitHub Actions:** Add these as repository secrets:
+- `GOOGLE_CLOUD_PROJECT`: Your GCP project ID  
+- `GOOGLE_TOKEN`: Service account JSON
 
-**Benefits:**
-- ✅ 100% free and open-source
-- ✅ Your code never leaves your machine
-- ✅ No cloud costs or rate limits
-- ✅ Works offline
-
-</details>
+That's it! Workflows in `.github/workflows/` will run automatically.
 
 ---
 
-## 🖥️ Running Ollama Locally (Open-Source Alternative)
+### Ollama (Local) - For Development
 
-### System Requirements
-
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **OS** | macOS, Linux, Windows (WSL2) | macOS or Linux |
-| **RAM** | 8GB (for 7B models) | 16GB+ (for 14B models) |
-| **Disk Space** | 5GB free | 20GB+ free |
-| **CPU** | Any modern CPU | Multi-core CPU |
-| **GPU** | Not required | NVIDIA/AMD GPU (10x faster) |
-
-### Installation Steps
-
-#### 1. Install Ollama
-
-**macOS / Linux:**
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-**Windows:**
-Download from [https://ollama.com/download/windows](https://ollama.com/download/windows)
-
-**Verify Installation:**
-```bash
-ollama --version
-```
-
-#### 2. Start Ollama Service
-
-**macOS:**
-Ollama starts automatically after installation.
-
-**Linux:**
-```bash
-# Start service
-ollama serve
-
-# Or run in background
-nohup ollama serve &
-```
-
-**Check if running:**
-```bash
-curl http://localhost:11434/api/tags
-```
-
-#### 3. Pull a Model
-
-**Recommended for most users:**
-```bash
-ollama pull qwen2.5-coder:14b
-```
-
-**Other options:**
-```bash
-# Faster, smaller model (4GB RAM)
-ollama pull qwen2.5-coder:7b
-
-# Most accurate (20GB RAM)
-ollama pull qwen2.5-coder:32b
-
-# Alternatives
-ollama pull codellama:13b
-ollama pull llama3.1:8b
-```
-
-**List installed models:**
-```bash
-ollama list
-```
-
-#### 4. Install AI-SAST
-
-```bash
-# Clone repository
-git clone https://github.com/YOUR_USERNAME/ai-sast.git
-cd ai-sast
-
-# Install Python dependencies
-pip install -r requirements.txt
-```
-
-#### 5. Configure AI-SAST for Ollama
-
-```bash
-# Set backend to Ollama
-export LLM_BACKEND="ollama"
-
-# Optional: Change model (defaults to qwen2.5-coder:14b)
-export OLLAMA_MODEL="qwen2.5-coder:14b"
-
-# Optional: Change Ollama URL (defaults to http://localhost:11434)
-export OLLAMA_BASE_URL="http://localhost:11434"
-```
-
-#### 6. Run Your First Scan
-
-```bash
-# Test with example
-python examples/ollama_scan.py
-
-# Scan a file
-python -m src.core.scanner --file your_file.py
-
-# Scan a directory
-python -m src.core.scanner --directory ./your-code
-```
-
-### Quick Start (All-in-One)
-
+**Quick Setup:**
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -254,487 +76,155 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Pull model
 ollama pull qwen2.5-coder:14b
 
-# Verify
-ollama list
-
 # Configure
 export LLM_BACKEND="ollama"
 
-# Run example
-cd ai-sast
+# Run
 python examples/ollama_scan.py
 ```
 
-### Troubleshooting
+**Benefits:** Free, private, offline, no rate limits
 
-**"Connection refused":**
-```bash
-# Make sure Ollama is running
-ollama serve
-
-# Or check status
-curl http://localhost:11434/api/tags
-```
-
-**"Model not found":**
-```bash
-# List available models
-ollama list
-
-# Pull the model you want
-ollama pull qwen2.5-coder:14b
-```
-
-**"Out of memory":**
-```bash
-# Use a smaller model
-ollama pull qwen2.5-coder:7b
-export OLLAMA_MODEL="qwen2.5-coder:7b"
-```
-
-**Slow performance:**
-```bash
-# Check if GPU is being used
-ollama ps
-
-# For NVIDIA GPUs, install CUDA drivers
-# For AMD GPUs, install ROCm drivers
-```
-
-### Model Selection Guide
-
-| Model | RAM | Speed | Accuracy | Best For |
-|-------|-----|-------|----------|----------|
-| `qwen2.5-coder:7b` | 4GB | Fast | ⭐⭐⭐⭐ | Quick scans, limited RAM |
-| `qwen2.5-coder:14b` | 8GB | Medium | ⭐⭐⭐⭐⭐ | **Recommended default** |
-| `qwen2.5-coder:32b` | 20GB | Slow | ⭐⭐⭐⭐⭐ | Maximum accuracy |
-| `codellama:13b` | 8GB | Medium | ⭐⭐⭐⭐ | Alternative option |
-| `llama3.1:8b` | 5GB | Medium | ⭐⭐⭐⭐ | General purpose |
-
-### Switching Between Vertex AI and Ollama
-
-**Use Vertex AI:**
-```bash
-unset LLM_BACKEND  # Uses default (vertex)
-# or
-export LLM_BACKEND="vertex"
-```
-
-**Use Ollama:**
-```bash
-export LLM_BACKEND="ollama"
-```
-
-### Performance Tips
-
-1. **Use GPU**: Install NVIDIA CUDA or AMD ROCm for 5-10x speedup
-2. **Smaller models**: Use `qwen2.5-coder:7b` for faster scans
-3. **More RAM**: Close other applications to free memory
-4. **SSD**: Store models on SSD for faster loading
-5. **Keep models updated**: Run `ollama pull <model>` periodically
+📚 **Detailed Ollama guide:** [Wiki - Ollama Setup](../../wiki/Ollama-Setup)
 
 ---
-
-### Prerequisites
-
-- Python 3.8 or higher
-- Google Cloud Platform account with Vertex AI API enabled
-- Google Cloud CLI (optional, for easier authentication)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/YOUR_USERNAME/ai-sast.git
-cd ai-sast
-```
-
-2. Run the setup script:
-```bash
-python setup.py
-```
-
-This will:
-- Check your Python version
-- Install required packages from `requirements.txt`
-- Verify Google Cloud CLI installation (optional)
-- Help you create an `env_config.txt` file
-
-### Configuration
-
-Set your Google Cloud project ID and location:
-
-```bash
-export GOOGLE_CLOUD_PROJECT="your-project-id"
-export GOOGLE_LOCATION="us-central1"
-```
-
-Or source the `env_config.txt` file:
-
-```bash
-source env_config.txt
-```
-
-📚 **See below for complete environment variable reference with examples**
-
-### Authentication
-
-#### Option 1: gcloud CLI (Recommended for Development)
-```bash
-gcloud auth application-default login
-```
-
-#### Option 2: Service Account Key
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
-```
-
-#### Option 3: GitHub Actions
-For GitHub Actions, use the `google-github-actions/auth` action with a service account key stored in GitHub Secrets.
 
 ## 📖 Usage
 
 ### Local Scanning
 
-#### Scan a single file
 ```bash
+# Scan a file
 python -m src.core.scanner --file /path/to/file.py
-```
 
-#### Scan a directory
-```bash
+# Scan a directory
 python -m src.core.scanner --directory /path/to/your/code
-```
 
-#### Scan a Git repository
-```bash
+# Scan a Git repository
 python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
 ```
 
-#### Generate an output report
-```bash
-python -m src.core.scanner --directory /path/to/code --output security_report.txt
-```
-
-### GitHub Actions Integration
-
-The project includes a GitHub Actions workflow for automated scanning. To use it:
-
-1. **Set up GitHub Secrets**:
-   - `GOOGLE_CREDENTIALS`: Your Google Cloud service account key (JSON)
-   - `GOOGLE_CLOUD_PROJECT`: Your Google Cloud Project ID
-
-2. **Add the workflow** (already included in `.github/workflows/security-scan.yml`):
-   - **On Pull Requests**: Scans only changed files (fast, targeted)
-   - **On Push to Main**: Scans entire repository (comprehensive)
-   - **Manual Trigger**: Can be triggered manually via workflow_dispatch
-   - Posts scan results as PR comments (for Critical/High findings)
-   - Uploads detailed reports as artifacts
-
-3. **Workflow Features**:
-   - Smart scanning: PR diffs vs full repository
-   - Automatic report generation (HTML + Markdown)
-   - PR comment integration with formatted results
-   - Artifact uploads with 30-day retention
-   - Configurable via secrets and environment variables
-
-4. **Required Permissions**:
-   - Ensure your service account has the "Vertex AI User" role
-   - Enable Vertex AI API in your Google Cloud project
-   - Workflow needs `pull-requests: write` for PR comments
-
-### Setting Up Developer Feedback Collection (Optional)
-
-By default, feedback is automatically stored in SQLite at `~/.ai-sast/scans.db`. 
-
-**For enterprise deployments with webhook integration:**
-
-1. **Deploy webhook listener** (optional):
-   ```bash
-   cd webhook/iac
-   terraform init
-   terraform apply
-   ```
-
-2. **Configure GitHub webhook**:
-   - Go to: Repository Settings → Webhooks → Add webhook
-   - Payload URL: `https://your-webhook-url.com/webhook`
-   - Content type: `application/json`
-   - Events: Select "Issue comments"
-   - Active: ✓
-   
-3. **Webhook Environment Variables** (if deploying):
-   ```bash
-   export GITHUB_WEBHOOK_SECRET="your-webhook-secret"  # Optional security
-   export AI_SAST_DB_PATH="~/.ai-sast/scans.db"        # Database path
-   ```
-
-4. **(Optional) Use Databricks** for centralized multi-team storage:
-   ```bash
-   # Uncomment databricks-sql-connector in requirements.txt
-   export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
-   export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
-   export DATABRICKS_ACCESS_TOKEN="your-access-token"
-   ```
-
-**How the feedback loop works:**
-1. AI-SAST posts findings as PR comments with checkboxes
-2. Developers check ✅ True Positive or ❌ False Positive
-3. Webhook captures the edit and stores feedback in SQLite/Databricks
-4. Future scans learn from this feedback to reduce false positives
-
-## ⚙️ Configuration Options
-
-### Optional Enterprise Integrations
-
-AI-SAST includes optional integrations for enterprise deployments:
-
-<details>
-<summary><b>📊 Databricks (Multi-team feedback storage)</b></summary>
-
-**Purpose:** Centralized feedback storage across multiple teams/repositories
+### GitHub Actions (CI/CD)
 
 **Setup:**
-```bash
-# Uncomment in requirements.txt
-# databricks-sql-connector>=2.0.0
 
-pip install databricks-sql-connector
+1. Add repository secrets (Settings → Secrets → Actions):
+   - `GOOGLE_CLOUD_PROJECT`: Your GCP project ID
+   - `GOOGLE_TOKEN`: Service account JSON
 
-export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
-export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
-export DATABRICKS_ACCESS_TOKEN="your-access-token"
-```
+2. Workflows run automatically:
+   - **PR Scan**: Scans changed files on pull requests
+   - **Full Scan**: Manual trigger for complete repository scan
+   - **Gitleaks**: Secret detection on every push
 
-**Usage:** Automatically used if environment variables are set. Falls back to SQLite if not configured.
-</details>
+**That's it!** Results appear as PR comments and artifacts.
 
-<details>
-<summary><b>🎫 Jira (Known vulnerability patterns)</b></summary>
+### Optional: Feedback Loop
 
-**Purpose:** Integrate with Jira to track security issues and known vulnerability patterns
+Developers can mark findings as true/false positives to improve accuracy over time. Feedback is automatically stored in SQLite.
 
-**Setup:**
+📚 **Setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
+
+---
+
+## 💡 Configuration
+
+### Jira Integration (Improves Accuracy)
+
+Integrating with Jira provides context to the LLM about known vulnerability patterns:
+
 ```bash
 export JIRA_SERVER="https://your-company.atlassian.net"
 export JIRA_EMAIL="your-email@company.com"
 export JIRA_API_TOKEN="your-jira-api-token"
-export JIRA_PROJECT_KEY="SEC"  # Your security project key
+export JIRA_PROJECT_KEY="SEC"
 ```
 
-**Note:** Jira integration is optional and primarily for tracking/reporting.
-</details>
+### Customize Scanning
 
-<details>
-<summary><b>📢 Notifications (Slack/Teams/Discord)</b></summary>
-
-**Purpose:** Send scan results to team chat channels
-
-**Setup:**
+**Filter PR comment severities:**
 ```bash
-# Slack
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
-
-# Microsoft Teams
-export TEAMS_WEBHOOK_URL="https://your-org.webhook.office.com/webhookb2/..."
-
-# Discord
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/..."
+export AI_SAST_SEVERITY="critical,high"  # Default
 ```
 
-**Usage:** Notifications are sent automatically if webhook URLs are configured.
-</details>
+**Exclude paths:**
+```bash
+export AI_SAST_EXCLUDE_PATHS="dist,build,vendor"
+```
+
+**Custom AI instructions:**
+```bash
+export AI_SAST_CUSTOM_PROMPT="Focus on authentication vulnerabilities"
+```
 
 ---
 
-### Environment Variables (Quick Reference)
+## ⚙️ Configuration
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| **LLM Backend** |
-| `LLM_BACKEND` | Backend to use: `vertex` or `ollama` | No | `vertex` |
-| **Vertex AI (Cloud)** |
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | Yes (for vertex) | - |
-| `GOOGLE_LOCATION` | Vertex AI location/region | No | `us-central1` |
-| `GEMINI_MODEL` | Gemini model to use | No | `gemini-2.0-flash-exp` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key JSON file | No | - |
-| `GOOGLE_TOKEN` | Service account JSON or access token | Yes (GitHub Actions) | - |
-| **Ollama (Local)** |
-| `OLLAMA_BASE_URL` | Ollama API endpoint | No | `http://localhost:11434` |
-| `OLLAMA_MODEL` | Model to use with Ollama | No | `qwen2.5-coder:14b` |
-| **Scanning** |
-| `AI_SAST_EXCLUDE_PATHS` | Comma-separated paths to exclude | No | (see below) |
-| `AI_SAST_CUSTOM_PROMPT` | Custom instructions to append to AI prompt | No | - |
-| `AI_SAST_SEVERITY` | Severities for PR comments: `critical,high,medium,low` | No | `critical,high` |
-| `AI_SAST_DB_PATH` | Path to SQLite database | No | `~/.ai-sast/scans.db` |
+### Required Environment Variables (Vertex AI)
 
-### Default Exclusions
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_PROJECT` | Your GCP project ID |
+| `GOOGLE_TOKEN` | Service account JSON (for GitHub Actions) |
 
-By default, AI-SAST excludes the following paths:
-- `test` - Test files and directories
-- `node_modules` - Node.js dependencies
-- `e2e` - End-to-end test directories
-- `cypress` - Cypress test files
-- `jest` - Jest test files
-- `mock` - Mock files
-- `log` - Log files
-- `.git` - Git directories
+### Optional Environment Variables
 
-To add custom exclusions:
-```bash
-export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs"
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GOOGLE_LOCATION` | GCP region | `us-central1` |
+| `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
+| `LLM_BACKEND` | `vertex` or `ollama` | `vertex` |
+| `OLLAMA_MODEL` | Ollama model (if using Ollama) | `qwen2.5-coder:14b` |
+| `AI_SAST_STORE_FINDINGS` | Store scan findings in DB | `false` |
+
+**Note on `AI_SAST_STORE_FINDINGS`:** Set to `true` to store all scan findings in the database for analytics. By default, only feedback is stored to keep the database lightweight.
+
+**For customization options (severity, exclusions, prompts)**, see "💡 Highly Recommended" section above.
+
+**For feedback loop setup**, see the [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
+
+---
+
+## 🔄 Feedback Loop (Continuous Improvement)
+
+AI-SAST includes a built-in feedback loop that learns from developer input to improve scan accuracy over time:
+
+### How It Works
+
+1. **Scan Results**: AI-SAST posts findings as PR comments with checkboxes
+2. **Developer Feedback**: Check boxes to mark findings as ✅ True Positive or ❌ False Positive
+3. **Learning**: Feedback is stored in SQLite (or Databricks)
+4. **Improvement**: Future scans include historical feedback in AI prompts to avoid false positives
+
+### Quick Setup
+
+The feedback workflow is already configured! When developers check boxes in PR comments, the system:
+
+1. Automatically collects feedback via GitHub Actions
+2. Stores it in `~/.ai-sast/scans.db` (SQLite)
+3. Includes it in future scan prompts
+
+**Example PR Comment:**
+```markdown
+<!-- vuln-id: abc12345 -->
+
+- [ ] ✅ True Positive
+- [ ] ❌ False Positive
+
+**ID**: `abc12345`
+**Severity**: High
+**Issue**: SQL Injection
+**Location**: user_query.py:42
 ```
 
-### Custom AI Instructions
+**After checking a box**, the feedback is stored and future scans will:
+- ✅ Avoid similar false positives
+- ✅ Be more vigilant about confirmed patterns
 
-You can provide custom instructions to the AI model using the `AI_SAST_CUSTOM_PROMPT` environment variable:
+📖 **Complete guide**: [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
-```bash
-export AI_SAST_CUSTOM_PROMPT="Focus on SQL injection and XSS vulnerabilities. Ignore file upload issues."
-```
-
-The default scanning prompt is stored in `prompts/default_prompt.txt` for easy review and customization. Your custom instructions via `AI_SAST_CUSTOM_PROMPT` will be appended to this base prompt.
-
-**Examples:**
-```bash
-# Focus on specific vulnerabilities
-export AI_SAST_CUSTOM_PROMPT="Prioritize authentication and authorization issues"
-
-# Adjust sensitivity
-export AI_SAST_CUSTOM_PROMPT="Only report issues with direct exploit paths"
-
-# Domain-specific guidance  
-export AI_SAST_CUSTOM_PROMPT="Pay special attention to payment processing and PII handling"
-```
-
-### Supported File Extensions
-
-AI-SAST scans specific file types for security vulnerabilities. The supported extensions are defined in `ai-sast-extensions.txt` file in the project root.
-
-**Default supported languages:**
-- Python (`.py`)
-- JavaScript/TypeScript (`.js`, `.ts`, `.jsx`, `.tsx`)
-- Java (`.java`)
-- C/C++ (`.c`, `.cpp`, `.h`, `.hpp`)
-- PHP (`.php`)
-- Ruby (`.rb`)
-- Go (`.go`)
-- Rust (`.rs`)
-- C# (`.cs`)
-- SQL (`.sql`)
-- Shell (`.sh`, `.bash`)
-- GraphQL (`.graphql`, `.gql`)
-
-**To customize:**
-Edit `ai-sast-extensions.txt` to add or remove file types:
-```bash
-# Add Swift files
-echo "*.swift" >> ai-sast-extensions.txt
-
-# Remove PHP files (comment out the line)
-sed -i 's/^\*.php$/# *.php/' ai-sast-extensions.txt
-```
-
-### Complete Environment Variable Reference
-
-#### Core Configuration (Vertex AI)
-
-```bash
-# GOOGLE_CLOUD_PROJECT (Required for Vertex AI)
-export GOOGLE_CLOUD_PROJECT="my-company-production"
-
-# GOOGLE_LOCATION (Optional, default: us-central1)
-export GOOGLE_LOCATION="us-central1"
-# Other options: "us-east1", "europe-west1", "asia-southeast1"
-
-# GEMINI_MODEL (Optional, default: gemini-2.0-flash-exp)
-export GEMINI_MODEL="gemini-2.0-flash-exp"
-# Other options: "gemini-1.5-pro", "gemini-2.5-pro"
-
-# GOOGLE_APPLICATION_CREDENTIALS (Optional for local development)
-# Use gcloud auth application-default login instead when possible
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
-
-# GOOGLE_TOKEN (Required for GitHub Actions only)
-# Automatically set by google-github-actions/auth action
-# Manual format: export GOOGLE_TOKEN='{"type":"service_account","project_id":"...",...}'
-```
-
-#### Scanning Configuration
-
-```bash
-# AI_SAST_CUSTOM_PROMPT (Optional)
-export AI_SAST_CUSTOM_PROMPT="Focus on SQL injection and XSS vulnerabilities"
-
-# AI_SAST_EXCLUDE_PATHS (Optional)
-export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs,*.min.js"
-
-# AI_SAST_SEVERITY (Optional, default: critical,high)
-# Controls which severity levels are posted as PR comments
-export AI_SAST_SEVERITY="critical,high"
-# Options:
-#   - "critical,high" (default) - Only critical and high severity findings
-#   - "critical,high,medium" - Include medium severity findings
-#   - "critical,high,medium,low" - Include all findings except info
-#   - "critical" - Only critical findings
-# Note: Full scan reports always include all severities, this only affects PR comments
-```
-
-#### GitHub Actions Configuration
-
-**To customize PR comment severities in GitHub Actions:**
-
-1. Go to: **Repository Settings → Secrets and variables → Actions → Variables**
-2. Click **New repository variable**
-3. Set:
-   - **Name**: `AI_SAST_SEVERITY`
-   - **Value**: `critical,high,medium` (or your preferred severities)
-
-**Examples:**
-```bash
-# Show only critical issues (very strict)
-AI_SAST_SEVERITY=critical
-
-# Show critical and high (default, recommended)
-AI_SAST_SEVERITY=critical,high
-
-# Show critical, high, and medium (more verbose)
-AI_SAST_SEVERITY=critical,high,medium
-
-# Show everything except info (very verbose)
-AI_SAST_SEVERITY=critical,high,medium,low
-```
-
-#### Environment File Template
-
-Create a `.env` file:
-
-```bash
-# .env - AI-SAST Configuration
-# DO NOT COMMIT THIS FILE
-
-# === LLM Backend Selection ===
-LLM_BACKEND=vertex  # or "ollama" for local
-
-# === Vertex AI Configuration (Required if LLM_BACKEND=vertex) ===
-GOOGLE_CLOUD_PROJECT=your-project-id
-GOOGLE_LOCATION=us-central1
-GEMINI_MODEL=gemini-2.0-flash-exp
-
-# === Ollama Configuration (Required if LLM_BACKEND=ollama) ===
-# OLLAMA_BASE_URL=http://localhost:11434
-# OLLAMA_MODEL=qwen2.5-coder:14b
-
-# === Scanning Configuration (Optional) ===
-# AI_SAST_EXCLUDE_PATHS=dist,build,vendor
-# AI_SAST_CUSTOM_PROMPT=Focus on SQL injection and XSS
-# AI_SAST_SEVERITY=critical,high
-```
-
-Then load it:
-```bash
-source .env
-```
+---
 
 ## 📊 Report Format
 
@@ -771,56 +261,6 @@ AI-SAST generates reports with the following information for each vulnerability:
 - **Fix**: Use parameterized queries instead of string concatenation...
 ```
 
-## 🏗️ Project Structure
-
-```
-ai-sast/
-├── src/
-│   ├── __init__.py
-│   ├── core/
-│   │   ├── __init__.py
-│   │   ├── config.py          # Configuration management
-│   │   ├── scanner.py         # Main security scanner
-│   │   ├── vertex.py          # Vertex AI client
-│   │   └── report.py          # Report generation
-│   ├── integrations/          # Optional integrations
-│   │   ├── __init__.py
-│   │   ├── jira.py            # Jira integration
-│   │   ├── databricks.py      # Databricks integration
-│   │   ├── vector.py          # Vector/log aggregation
-│   │   └── notifications.py   # Slack/Teams/Discord notifications
-│   └── main/
-│       ├── __init__.py
-│       ├── full_scan.py       # Full repository scan (CI/CD)
-│       └── pr_scan.py         # Pull request diff scan (CI/CD)
-├── webhook/                   # Webhook listener for feedback
-│   ├── main.py               # Flask webhook application
-│   ├── Dockerfile            # Container image
-│   ├── requirements.txt      # Python dependencies
-│   ├── README.md            # Webhook setup guide
-│   └── iac/                 # Terraform infrastructure
-│       ├── main.tf
-│       ├── variables.tf
-│       └── modules/         # Terraform modules
-├── .github/
-│   └── workflows/
-│       └── security-scan.yml  # GitHub Actions workflow with Gitleaks
-├── prompts/
-│   └── default_prompt.txt     # Default AI scanning prompt
-├── docs/
-│   ├── ARCHITECTURE.md        # System architecture
-│   └── images/
-│       └── architecture.png   # Architecture diagram
-├── examples/                  # Example usage scripts
-├── tests/                     # Unit tests
-├── .gitleaks.toml            # Gitleaks configuration
-├── requirements.txt           # Python dependencies
-├── setup.py                   # Setup script
-├── LICENSE                    # Apache License 2.0
-├── CONTRIBUTING.md            # Contribution guidelines
-└── README.md                  # This file
-```
-
 ## 🔒 Security Best Practices
 
 This project follows OWASP security guidelines:
@@ -829,62 +269,25 @@ This project follows OWASP security guidelines:
 - ✅ Secure credential handling
 - ✅ Minimal logging of sensitive data
 
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
 ## 🐛 Troubleshooting
 
-### Authentication Errors
-- Verify you're authenticated with `gcloud` or have set credentials
+**Authentication Errors:**
 - Check service account has "Vertex AI User" role
-- Ensure `GOOGLE_CLOUD_PROJECT` is correct
+- Verify `GOOGLE_CLOUD_PROJECT` is correct
 
-### Model Not Available (404 Error)
-- AI-SAST uses `gemini-2.0-flash-exp` model by default
-- You can change it with: `export GEMINI_MODEL="gemini-1.5-pro"`
-- Ensure your project has access to the model
-- Contact Google Cloud support if needed
+**Model Not Available:**
+- Try different model: `export GEMINI_MODEL="gemini-1.5-pro"`
+- Enable Vertex AI API: `gcloud services enable aiplatform.googleapis.com`
 
-### API Not Enabled
-- Enable Vertex AI API: `aiplatform.googleapis.com`
-- Enable in Google Cloud Console under APIs & Services:
-  ```bash
-  gcloud services enable aiplatform.googleapis.com
-  ```
-
-### Rate Limiting
-- The scanner implements automatic retry with exponential backoff
-- If you hit rate limits frequently, consider:
-  - Reducing parallel workers with `--max-workers` flag
-  - Excluding more test files
-  - Spreading scans across multiple time periods
-
-## 🙏 Acknowledgments
-
-- Google Cloud Vertex AI for providing powerful AI models
-- OWASP for security testing guidelines
-- The open-source community for continuous inspiration
+**Rate Limiting:**
+- Reduce parallel workers: `--max-workers 1`
+- Exclude more files: `export AI_SAST_EXCLUDE_PATHS="dist,build,tests"`
 
 ## 📧 Support
 
-- 🐛 Issues: [GitHub Issues](https://github.com/YOUR_USERNAME/ai-sast/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/YOUR_USERNAME/ai-sast/discussions)
-- 📖 Documentation: [Wiki](https://github.com/YOUR_USERNAME/ai-sast/wiki)
-
-## 🗺️ Roadmap
-
-- [ ] Parallel file scanning for faster scans
+- 🐛 **Issues**: [Report bugs](../../issues)
+- 💬 **Discussions**: [Ask questions](../../discussions)
+- 📖 **Documentation**: [Browse the Wiki](../../wiki)
 
 ---
 

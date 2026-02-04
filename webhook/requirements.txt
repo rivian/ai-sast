@@ -1,5 +1,0 @@
-Flask==3.0.0
-requests>=2.31.0
-boto3>=1.34.0
-databricks-sql-connector>=2.9.0
-

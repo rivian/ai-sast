@@ -375,30 +375,31 @@ class ScanDatabase:
             
             if repo_url:
                 project_id = self._extract_project_identifier(repo_url)
-                where = "WHERE repository LIKE ? OR repository LIKE ?"
+                # Use DISTINCT to avoid double-counting when both LIKE patterns match
+                where = "WHERE (repository LIKE ? OR repository LIKE ?)"
                 params = (f'%{project_id}%', f'{repo_url}%')
             else:
                 where = ""
                 params = ()
             
-            # Feedback stats
-            cursor.execute(f'SELECT COUNT(*) FROM feedback {where}', params)
+            # Feedback stats - using DISTINCT to avoid double counting
+            cursor.execute(f'SELECT COUNT(DISTINCT id) FROM feedback {where}', params)
             total_feedback = cursor.fetchone()[0]
             
             cursor.execute(f'''
-                SELECT COUNT(*) FROM feedback 
+                SELECT COUNT(DISTINCT id) FROM feedback 
                 {where} {"AND" if where else "WHERE"} status = 'false_positive'
             ''', params)
             false_positives = cursor.fetchone()[0]
             
             cursor.execute(f'''
-                SELECT COUNT(*) FROM feedback 
+                SELECT COUNT(DISTINCT id) FROM feedback 
                 {where} {"AND" if where else "WHERE"} status = 'confirmed_vulnerability'
             ''', params)
             confirmed = cursor.fetchone()[0]
             
             # Scan results stats
-            cursor.execute(f'SELECT COUNT(*) FROM scan_results {where}', params)
+            cursor.execute(f'SELECT COUNT(DISTINCT id) FROM scan_results {where}', params)
             total_scans = cursor.fetchone()[0]
             
             conn.close()

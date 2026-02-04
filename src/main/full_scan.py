@@ -9,14 +9,98 @@ an entire repository for security vulnerabilities.
 import sys
 import os
 import argparse
+import hashlib
+import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from src.core.scanner import SecurityScanner
 from src.core.report import HTMLReportGenerator
+
+
+def _generate_vuln_id(file_path: str, issue: str, location: str) -> str:
+    """Generates a unique and stable ID for a vulnerability."""
+    unique_string = f"{file_path}-{issue}-{location}"
+    return hashlib.sha1(unique_string.encode()).hexdigest()[:8]
+
+
+def _store_scan_findings(scan_results: List[Dict], repo_url: str, scan_id: str):
+    """
+    Store scan findings in database if AI_SAST_STORE_FINDINGS is enabled.
+    
+    Args:
+        scan_results: List of scan result dictionaries
+        repo_url: Repository URL
+        scan_id: Unique identifier for this scan
+    """
+    # Check if storage is enabled (default: false)
+    store_findings = os.environ.get('AI_SAST_STORE_FINDINGS', 'false').lower() in ['true', '1', 'yes']
+    
+    if not store_findings:
+        return
+    
+    try:
+        from src.integrations.scan_database import ScanDatabase
+        
+        print(f"\n💾 Storing scan findings in database (AI_SAST_STORE_FINDINGS=true)...")
+        db = ScanDatabase()
+        
+        stored_count = 0
+        for result in scan_results:
+            file_path = result.get('file_path', 'unknown')
+            analysis = result.get('analysis', '')
+            
+            # Parse vulnerabilities from analysis
+            vuln_pattern = re.compile(
+                r"-\s*\*\*Vulnerability Level\*\*:\s*(CRITICAL|HIGH|MEDIUM|LOW|INFO)\s*\n"
+                r"-\s*\*\*Issue\*\*:\s*(.*?)\n"
+                r"-\s*\*\*Location\*\*:\s*(.*?)\n"
+                r"(?:-\s*\*\*CVSS Vector\*\*:\s*(.*?)\n)?"
+                r"-\s*\*\*Risk\*\*:\s*(.*?)\n"
+                r"-\s*\*\*Fix\*\*:\s*(.*?)(?:\n-|\n\n|$)",
+                re.DOTALL | re.IGNORECASE
+            )
+            
+            for match in vuln_pattern.finditer(analysis):
+                severity = match.group(1).strip()
+                issue = match.group(2).strip()
+                location = match.group(3).strip()
+                cvss_vector = match.group(4).strip() if match.group(4) else None
+                risk = match.group(5).strip()
+                fix = match.group(6).strip()
+                
+                # Generate vulnerability ID
+                vuln_id = _generate_vuln_id(file_path, issue, location)
+                
+                # Store in database
+                success = db.store_scan_result(
+                    scan_id=scan_id,
+                    repo_url=repo_url,
+                    pr_number=None,
+                    file_path=file_path,
+                    vulnerability_id=vuln_id,
+                    issue=issue,
+                    severity=severity,
+                    cvss_vector=cvss_vector,
+                    location=location,
+                    description=risk,
+                    risk=risk,
+                    fix=fix,
+                    scan_type="full"
+                )
+                
+                if success:
+                    stored_count += 1
+        
+        db.close()
+        print(f"✅ Stored {stored_count} finding(s) in database")
+        
+    except Exception as e:
+        print(f"⚠️  Warning: Could not store findings in database: {e}")
+        # Don't fail the scan if storage fails
 
 
 def main():
@@ -62,6 +146,11 @@ def main():
         results = scanner.scan_directory(scan_dir, max_workers=args.max_workers)
         
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        github_sha = os.environ.get('GITHUB_SHA', 'unknown')
+        scan_id = f"full-{github_sha[:7]}-{timestamp}"
+        
+        # Store scan findings in database (if enabled)
+        _store_scan_findings(results, repo_url or os.path.abspath(scan_dir), scan_id)
         
         # Generate text report
         text_report_file = f'{args.output_prefix}_report_{timestamp}.txt'
