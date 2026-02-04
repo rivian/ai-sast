@@ -28,8 +28,6 @@ AI-SAST provides intelligent, AI-powered security scanning with an optional feed
 
 ![AI-SAST Architecture](docs/images/architecture.png)
 
-> 📝 **Note**: Please save the architecture diagram image as `docs/images/architecture.png` in the repository.
-
 ### How It Works
 
 1. **Scan Trigger**: Pull requests or manual triggers start a scan
@@ -123,91 +121,41 @@ python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
 
 ### Optional: Feedback Loop
 
-Developers can mark findings as true/false positives to improve accuracy over time. Feedback is automatically stored in SQLite when developers check boxes in PR comments.
+Developers can mark findings as true/false positives to improve accuracy over time. Feedback is automatically stored in SQLite.
 
 📚 **Setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
 
 ---
 
-## 💡 Highly Recommended
+## 💡 Configuration
 
 ### Jira Integration (Improves Accuracy)
 
-Integrating with Jira provides context to the LLM about known vulnerability patterns, significantly improving finding accuracy:
+Integrating with Jira provides context to the LLM about known vulnerability patterns:
 
 ```bash
 export JIRA_SERVER="https://your-company.atlassian.net"
 export JIRA_EMAIL="your-email@company.com"
 export JIRA_API_TOKEN="your-jira-api-token"
-export JIRA_PROJECT_KEY="SEC"  # Your security project key
+export JIRA_PROJECT_KEY="SEC"
 ```
 
-**Why it helps:**
-- LLM learns from historical security tickets
-- Reduces false positives by understanding your codebase patterns
-- Prioritizes findings based on real vulnerabilities found in the past
-
-### Feedback Storage (Continuous Improvement)
-
-Choose a storage backend to capture developer feedback and improve over time:
-
-**SQLite (Default - Included)**
-- ✅ Zero configuration
-- ✅ Stored locally at `~/.ai-sast/scans.db`
-- ✅ Perfect for single teams/repositories
-
-**Vector/Databricks (Enterprise)**
-- ✅ Centralized storage across all teams
-- ✅ Organization-wide learning
-- ✅ Advanced analytics and trends
-- ✅ Scales to 1000+ repositories
-
-```bash
-# Databricks example
-export DATABRICKS_SERVER_HOSTNAME="your-workspace.cloud.databricks.com"
-export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/your-warehouse-id"
-export DATABRICKS_ACCESS_TOKEN="your-access-token"
-```
-
-**Why it matters:**
-- Developers mark findings as true/false positives
-- System learns from feedback to reduce false positives
-- Accuracy improves continuously with each scan
-
-📚 **Full setup guide:** [Wiki - Feedback Loop](../../wiki/Feedback-Loop)
-
-### Customization (Fine-tune Scanning)
+### Customize Scanning
 
 **Filter PR comment severities:**
 ```bash
-# Default: Show only Critical and High in PR comments
-export AI_SAST_SEVERITY="critical,high"
-
-# Show all severities (more verbose)
-export AI_SAST_SEVERITY="critical,high,medium,low"
-
-# Show only Critical (very strict)
-export AI_SAST_SEVERITY="critical"
+export AI_SAST_SEVERITY="critical,high"  # Default
 ```
 
-**Note:** Full HTML reports always include all severities. This only affects PR comments.
-
-**For GitHub Actions:** Set as repository variable at Settings → Actions → Variables:
-- Name: `AI_SAST_SEVERITY`
-- Value: `critical,high,medium` (or your preference)
-
-**Exclude paths from scanning:**
+**Exclude paths:**
 ```bash
-export AI_SAST_EXCLUDE_PATHS="dist,build,vendor,docs"
+export AI_SAST_EXCLUDE_PATHS="dist,build,vendor"
 ```
 
 **Custom AI instructions:**
 ```bash
-export AI_SAST_CUSTOM_PROMPT="Focus on authentication and SQL injection vulnerabilities"
+export AI_SAST_CUSTOM_PROMPT="Focus on authentication vulnerabilities"
 ```
-
-**Supported languages:** Python, JavaScript/TypeScript, Java, C/C++, PHP, Ruby, Go, Rust, C#, SQL, Shell, GraphQL
-*(Edit `ai-sast-extensions.txt` to customize)*
 
 ---
 
@@ -321,62 +269,25 @@ This project follows OWASP security guidelines:
 - ✅ Secure credential handling
 - ✅ Minimal logging of sensitive data
 
-## 🤝 Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
 ## 🐛 Troubleshooting
 
-### Authentication Errors
-- Verify you're authenticated with `gcloud` or have set credentials
+**Authentication Errors:**
 - Check service account has "Vertex AI User" role
-- Ensure `GOOGLE_CLOUD_PROJECT` is correct
+- Verify `GOOGLE_CLOUD_PROJECT` is correct
 
-### Model Not Available (404 Error)
-- AI-SAST uses `gemini-2.0-flash-exp` model by default
-- You can change it with: `export GEMINI_MODEL="gemini-1.5-pro"`
-- Ensure your project has access to the model
-- Contact Google Cloud support if needed
+**Model Not Available:**
+- Try different model: `export GEMINI_MODEL="gemini-1.5-pro"`
+- Enable Vertex AI API: `gcloud services enable aiplatform.googleapis.com`
 
-### API Not Enabled
-- Enable Vertex AI API: `aiplatform.googleapis.com`
-- Enable in Google Cloud Console under APIs & Services:
-  ```bash
-  gcloud services enable aiplatform.googleapis.com
-  ```
-
-### Rate Limiting
-- The scanner implements automatic retry with exponential backoff
-- If you hit rate limits frequently, consider:
-  - Reducing parallel workers with `--max-workers` flag
-  - Excluding more test files
-  - Spreading scans across multiple time periods
-
-## 🙏 Acknowledgments
-
-- Google Cloud Vertex AI for providing powerful AI models
-- OWASP for security testing guidelines
-- The open-source community for continuous inspiration
+**Rate Limiting:**
+- Reduce parallel workers: `--max-workers 1`
+- Exclude more files: `export AI_SAST_EXCLUDE_PATHS="dist,build,tests"`
 
 ## 📧 Support
 
-- 🐛 **Issues**: Report bugs or request features in the [Issues](../../issues) tab
-- 💬 **Discussions**: Ask questions in the [Discussions](../../discussions) tab
-- 📖 **Documentation**: Browse the [Wiki](../../wiki) for detailed guides
-
-## 🗺️ Roadmap
-
-- [ ] Parallel file scanning for faster scans
+- 🐛 **Issues**: [Report bugs](../../issues)
+- 💬 **Discussions**: [Ask questions](../../discussions)
+- 📖 **Documentation**: [Browse the Wiki](../../wiki)
 
 ---
 
