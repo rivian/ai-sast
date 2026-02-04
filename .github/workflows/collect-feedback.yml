@@ -1,0 +1,66 @@
+name: Collect AI-SAST Feedback
+
+# This workflow collects feedback when users check boxes in PR comments
+# It stores feedback in SQLite (default) or Databricks for improving future scans
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  collect-feedback:
+    name: Process Feedback from PR Comment
+    runs-on: ubuntu-latest
+    # Only run on pull request comments that contain our marker
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '🤖 AI-SAST Security Scan')
+    
+    env:
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      GOOGLE_LOCATION: us-central1
+      # Optional: Configure Databricks for centralized feedback storage
+      AI_SAST_DATABRICKS_HOST: ${{ secrets.AI_SAST_DATABRICKS_HOST }}
+      AI_SAST_DATABRICKS_HTTP_PATH: ${{ secrets.AI_SAST_DATABRICKS_HTTP_PATH }}
+      AI_SAST_DATABRICKS_TOKEN: ${{ secrets.AI_SAST_DATABRICKS_TOKEN }}
+      AI_SAST_DATABRICKS_CATALOG: ${{ secrets.AI_SAST_DATABRICKS_CATALOG }}
+      AI_SAST_DATABRICKS_SCHEMA: ${{ secrets.AI_SAST_DATABRICKS_SCHEMA }}
+      AI_SAST_DATABRICKS_TABLE: ${{ secrets.AI_SAST_DATABRICKS_TABLE }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python --version
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Process feedback from comment
+        run: |
+          echo "📝 Processing feedback from PR comment"
+          python -m src.main.collect_feedback
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Comment on successful feedback collection
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '✅ Thank you for your feedback! It has been recorded and will help improve future AI-SAST scans.'
+            });

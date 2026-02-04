@@ -26,10 +26,15 @@ def parse_feedback_from_comment(comment_body: str) -> List[Dict]:
     Parse feedback checkboxes from PR comment
     
     Expected format in comment:
-    - [x] ✅ True Positive  [ ] ❌ False Positive
-      **Issue**: SQL Injection in user_query.py:42
-      **CVSS**: CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
-      ...
+    <!-- vuln-id: abc123 -->
+    - [x] ✅ True Positive
+    - [ ] ❌ False Positive
+    **ID**: `abc123`
+    **Severity**: High
+    **Issue**: SQL Injection in user_query.py
+    **Location**: user_query.py:42
+    **CVSS Vector**: `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H`
+    ...
     
     Args:
         comment_body: The PR comment text
@@ -39,30 +44,37 @@ def parse_feedback_from_comment(comment_body: str) -> List[Dict]:
     """
     feedback_list = []
     
-    # Pattern to match feedback sections
-    # Matches: - [x] ✅ True Positive  [ ] ❌ False Positive
-    pattern = r'- \[([ x])\] ✅ True Positive\s+\[([ x])\] ❌ False Positive'
+    # Split comment by vuln-id markers to process each finding
+    vuln_sections = re.split(r'<!-- vuln-id: ([a-f0-9]+) -->', comment_body)
     
-    # Split comment into sections by the feedback pattern
-    sections = re.split(pattern, comment_body)
-    
-    # Process sections in groups of 3 (match, tp_checkbox, fp_checkbox, content)
-    for i in range(1, len(sections), 3):
-        if i + 2 >= len(sections):
+    # Process sections in pairs (vuln_id, content)
+    for i in range(1, len(vuln_sections), 2):
+        if i + 1 >= len(vuln_sections):
             break
             
-        tp_checked = sections[i].strip() == 'x'
-        fp_checked = sections[i + 1].strip() == 'x'
-        content = sections[i + 2] if i + 2 < len(sections) else ""
+        vuln_id = vuln_sections[i].strip()
+        content = vuln_sections[i + 1] if i + 1 < len(vuln_sections) else ""
         
-        # Only process if one checkbox is selected
-        if not (tp_checked or fp_checked):
+        # Check which checkbox is selected (must be within ~200 chars of vuln-id)
+        first_part = content[:200]
+        
+        tp_match = re.search(r'- \[([xX ])\] ✅ True Positive', first_part)
+        fp_match = re.search(r'- \[([xX ])\] ❌ False Positive', first_part)
+        
+        if not tp_match or not fp_match:
+            continue
+            
+        tp_checked = tp_match.group(1).lower() == 'x'
+        fp_checked = fp_match.group(1).lower() == 'x'
+        
+        # Only process if exactly one checkbox is selected
+        if not (tp_checked or fp_checked) or (tp_checked and fp_checked):
             continue
         
         status = "confirmed_vulnerability" if tp_checked else "false_positive"
         
         # Extract vulnerability details from content
-        vuln_data = _extract_vulnerability_details(content)
+        vuln_data = _extract_vulnerability_details(content, vuln_id)
         if vuln_data:
             vuln_data['status'] = status
             feedback_list.append(vuln_data)
@@ -70,52 +82,65 @@ def parse_feedback_from_comment(comment_body: str) -> List[Dict]:
     return feedback_list
 
 
-def _extract_vulnerability_details(content: str) -> Optional[Dict]:
+def _extract_vulnerability_details(content: str, vuln_id: str) -> Optional[Dict]:
     """
     Extract vulnerability details from comment section
     
     Args:
         content: Section of comment with vulnerability details
+        vuln_id: The unique vulnerability ID from the comment
         
     Returns:
         Dictionary with vulnerability data or None
     """
-    details = {}
+    details = {'vuln_id': vuln_id}
     
     # Extract severity
     severity_match = re.search(r'\*\*Severity\*\*:\s*(\w+)', content, re.IGNORECASE)
     if severity_match:
         details['severity'] = severity_match.group(1)
+    else:
+        # Default to UNKNOWN if not found
+        details['severity'] = 'UNKNOWN'
     
     # Extract issue description
     issue_match = re.search(r'\*\*Issue\*\*:\s*(.+?)(?:\n|$)', content)
     if issue_match:
         details['issue'] = issue_match.group(1).strip()
+    else:
+        details['issue'] = 'Unknown Issue'
     
-    # Extract file and location
-    location_match = re.search(r'\*\*Location\*\*:\s*(.+?)(?:\n|$)', content)
+    # Extract file and location from Location field
+    # Format can be: `file.py:42` or just `file.py`
+    location_match = re.search(r'\*\*Location\*\*:\s*(?:\[`([^`]+)`\]|\`([^`]+)\`)', content)
     if location_match:
-        location_str = location_match.group(1).strip()
-        # Parse "file.py:42" or "file.py, Line 42"
-        file_match = re.match(r'([^:,]+)', location_str)
-        if file_match:
-            details['file_path'] = file_match.group(1).strip()
-            details['location'] = location_str
+        location_str = location_match.group(1) or location_match.group(2)
+        details['location'] = location_str
+        
+        # Parse file path and line number
+        if ':' in location_str:
+            parts = location_str.split(':')
+            details['file_path'] = parts[0].strip()
+        else:
+            details['file_path'] = location_str.strip()
+    else:
+        details['file_path'] = 'unknown'
+        details['location'] = 'unknown'
     
     # Extract CVSS vector
-    cvss_match = re.search(r'\*\*CVSS Vector\*\*:\s*(CVSS:[^\n]+)', content)
+    cvss_match = re.search(r'\*\*CVSS Vector\*\*:\s*`?([^`\n]+)`?', content)
     if cvss_match:
         details['cvss_vector'] = cvss_match.group(1).strip()
     
-    # Extract developer feedback/comments (if any)
-    feedback_match = re.search(r'\*\*Comment\*\*:\s*(.+?)(?:\n\n|\n-|\Z)', content, re.DOTALL)
+    # Extract developer feedback/comments (look for replies in thread)
+    feedback_match = re.search(r'\*\*Optional Comment\*\*:?\s*(.+?)(?:\n\n|---|\Z)', content, re.DOTALL)
     if feedback_match:
-        details['feedback'] = feedback_match.group(1).strip()
+        comment_text = feedback_match.group(1).strip()
+        if comment_text and comment_text != '(Reply to this PR to explain your feedback)':
+            details['feedback'] = comment_text
     
-    # Generate a unique ID from the content
-    if 'file_path' in details and 'issue' in details:
-        vuln_id = f"{details['file_path']}:{details.get('location', 'unknown')}:{details['issue'][:50]}"
-        details['vuln_id'] = vuln_id
+    # Validate we have minimum required fields
+    if details.get('file_path') and details.get('issue'):
         return details
     
     return None

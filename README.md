@@ -233,6 +233,48 @@ export AI_SAST_CUSTOM_PROMPT="Focus on authentication and SQL injection vulnerab
 
 **For webhook/enterprise features**, see [docs/WEBHOOKS.md](docs/WEBHOOKS.md)
 
+**For feedback loop setup**, see [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
+
+---
+
+## 🔄 Feedback Loop (Continuous Improvement)
+
+AI-SAST includes a built-in feedback loop that learns from developer input to improve scan accuracy over time:
+
+### How It Works
+
+1. **Scan Results**: AI-SAST posts findings as PR comments with checkboxes
+2. **Developer Feedback**: Check boxes to mark findings as ✅ True Positive or ❌ False Positive
+3. **Learning**: Feedback is stored in SQLite (or Databricks)
+4. **Improvement**: Future scans include historical feedback in AI prompts to avoid false positives
+
+### Quick Setup
+
+The feedback workflow is already configured! When developers check boxes in PR comments, the system:
+
+1. Automatically collects feedback via GitHub Actions
+2. Stores it in `~/.ai-sast/scans.db` (SQLite)
+3. Includes it in future scan prompts
+
+**Example PR Comment:**
+```markdown
+<!-- vuln-id: abc12345 -->
+
+- [ ] ✅ True Positive
+- [ ] ❌ False Positive
+
+**ID**: `abc12345`
+**Severity**: High
+**Issue**: SQL Injection
+**Location**: user_query.py:42
+```
+
+**After checking a box**, the feedback is stored and future scans will:
+- ✅ Avoid similar false positives
+- ✅ Be more vigilant about confirmed patterns
+
+📖 **Complete guide**: [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
+
 ---
 
 ## 📊 Report Format
@@ -309,7 +351,8 @@ ai-sast/
 ├── docs/
 │   ├── ARCHITECTURE.md        # System architecture
 │   ├── OLLAMA.md              # Ollama setup guide
-│   ├── WEBHOOKS.md            # Feedback loop & webhooks
+│   ├── WEBHOOKS.md            # Webhook integration
+│   ├── FEEDBACK-LOOP.md       # Feedback loop guide
 │   └── images/
 │       └── architecture.png   # Architecture diagram
 ├── examples/                  # Example usage scripts
