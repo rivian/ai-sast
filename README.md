@@ -60,7 +60,7 @@ python -m src.main.pr_scan
 
 **For GitHub Actions:** Add these as repository secrets:
 - `GOOGLE_CLOUD_PROJECT`: Your GCP project ID  
-- `GOOGLE_TOKEN`: Service account JSON
+- `GOOGLE_CREDENTIALS`: Service account JSON (used by the workflow’s Google auth step)
 
 That's it! Workflows in `.github/workflows/` will run automatically.
 
@@ -110,7 +110,7 @@ python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
 
 1. Add repository secrets (Settings → Secrets → Actions):
    - `GOOGLE_CLOUD_PROJECT`: Your GCP project ID
-   - `GOOGLE_TOKEN`: Service account JSON
+   - `GOOGLE_CREDENTIALS`: Service account JSON (required by the workflow’s Google Cloud auth step)
 
 2. Workflows run automatically:
    - **PR Scan**: Scans changed files on pull requests
@@ -118,6 +118,20 @@ python -m src.core.scanner --repo https://github.com/user/repo.git --branch main
    - **Gitleaks**: Secret detection on every push
 
 **That's it!** Results appear as PR comments and artifacts.
+
+#### Using AI-SAST in another repository (runs in your repo, on your runners)
+
+**Your code never runs on ai-sast infrastructure.** The workflow runs in your repo on your runners and checks out the ai-sast scanner at runtime—no submodule or copy required.
+
+1. **Copy the workflow file** into your repo as `.github/workflows/ai-sast.yml`:  
+   [`.github/workflows/ai-sast.yml`](.github/workflows/ai-sast.yml)
+
+2. **Add repository secrets** (Settings → Secrets and variables → Actions):  
+   `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CREDENTIALS`
+
+The workflow checks out **`rivian/ai-sast`** by default. **Optional:** set `AI_SAST_REPO` (e.g. for a fork); `AI_SAST_BASE_BRANCH` (default `main`); `runs-on: self-hosted` for your own runners. **Full scan:** Actions → “AI-SAST” → “Run workflow”.
+
+📚 **Full integration guide:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
 ### Optional: Feedback Loop
 
@@ -166,7 +180,7 @@ export AI_SAST_CUSTOM_PROMPT="Focus on authentication vulnerabilities"
 | Variable | Description |
 |----------|-------------|
 | `GOOGLE_CLOUD_PROJECT` | Your GCP project ID |
-| `GOOGLE_TOKEN` | Service account JSON (for GitHub Actions) |
+| `GOOGLE_CREDENTIALS` | Repository secret: service account JSON (for GitHub Actions auth) |
 
 ### Optional Environment Variables
 
