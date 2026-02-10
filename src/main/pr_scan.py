@@ -50,14 +50,10 @@ def get_pr_changes_from_github() -> List[Dict]:
     changes = []
     
     if github_event_path and os.path.exists(github_event_path):
-        # Read the GitHub event payload
         with open(github_event_path, 'r') as f:
             event = json.load(f)
-        
-        # Get base and head SHAs
         base_sha = event.get('pull_request', {}).get('base', {}).get('sha')
         head_sha = event.get('pull_request', {}).get('head', {}).get('sha')
-        
         if base_sha and head_sha:
             print(f"Comparing {base_sha[:7]}...{head_sha[:7]}")
             
