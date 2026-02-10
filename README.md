@@ -15,6 +15,16 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 - Multi-language support (Python, JS/TS, Java, Go, Rust, C/C++, and more)
 - CVSS scoring, configurable exclusions, optional feedback loop
 
+## Architecture
+
+![AI-SAST Architecture](docs/images/architecture.png)
+
+1. **Trigger**: Pull request or manual "Run workflow"
+2. **Scan**: Code is analyzed by Vertex AI (Gemini) or Ollama
+3. **Results**: PR comments and HTML/text report artifacts
+
+📖 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
 ## Integrate in your repository
 
 1. **Copy the workflow file** into your repo as `.github/workflows/ai-sast.yml`:  
@@ -28,16 +38,6 @@ The workflow checks out **`rivian/ai-sast`** at runtime. **PR scan** runs on pul
 **Optional:** Set variable `AI_SAST_REPO` (e.g. for a fork); `AI_SAST_BASE_BRANCH` (default `main`); `runs-on: self-hosted` in the workflow for your own runners.
 
 📚 **Full guide:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
-
-## Architecture
-
-![AI-SAST Architecture](docs/images/architecture.png)
-
-1. **Trigger**: Pull request or manual "Run workflow"
-2. **Scan**: Code is analyzed by Vertex AI (Gemini) or Ollama
-3. **Results**: PR comments and HTML/text report artifacts
-
-📖 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Optional configuration
 
