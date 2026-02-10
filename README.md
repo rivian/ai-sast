@@ -33,7 +33,7 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 2. **Add repository secrets** (Settings → Secrets and variables → Actions):  
    `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CREDENTIALS`
 
-The workflow checks out **`rivian/ai-sast`** at runtime. **PR scan** runs on pull requests (when base branch is `main`); **full scan** runs when you click "Run workflow" in the Actions tab.
+The workflow checks out **`rivian/ai-sast`** at runtime. One file runs **PR scan** (on pull requests when base branch is `main`), **full scan** (manual "Run workflow"), and **feedback collection** (when someone edits a PR comment and checks a true/false positive box).
 
 **Optional:** Set variable `AI_SAST_REPO` (e.g. for a fork); `AI_SAST_BASE_BRANCH` (default `main`); `runs-on: self-hosted` in the workflow for your own runners.
 
@@ -43,7 +43,6 @@ The workflow checks out **`rivian/ai-sast`** at runtime. **PR scan** runs on pul
 
 - **Historical vulnerabilities (highly recommended):** Add Jira context so the LLM sees past vulnerability patterns and improves accuracy. Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` as repository variables or in the workflow env.
 - **Severity filter**: Set variable `AI_SAST_SEVERITY` (e.g. `critical,high`). Default: `critical,high`.
-- **Feedback loop**: [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
 
 ## Example PR comment
 
@@ -76,6 +75,20 @@ When the PR scan finds issues, it posts a comment like this:
 **Fix:** Use parameterized queries...
 </details>
 ```
+
+## Feedback loop
+
+Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is stored (SQLite by default, or Databricks) and included in future scan prompts so the AI gets more accurate over time.
+
+**How it works:**
+1. **PR scan** posts a comment with checkboxes next to each finding.
+2. **Developer** checks one box per finding (True Positive or False Positive).
+3. **collect-feedback** workflow runs when the comment is edited and stores the feedback.
+4. **Future scans** use this history in the AI context to reduce false positives and focus on real issues.
+
+Feedback collection is included in the same workflow file (see Integrate in your repository). No extra configuration needed for SQLite.
+
+📖 **Full guide:** [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
 
 ## Troubleshooting
 
