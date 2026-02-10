@@ -59,20 +59,20 @@ jobs:
 
       - name: Run AI-SAST PR Scan
         if: github.event_name == 'pull_request'
-        id: scan
+        id: pr-scan
         run: PYTHONPATH=${{ github.workspace }}/ai-sast python -m src.main.pr_scan
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run AI-SAST Full Scan
         if: github.event_name == 'workflow_dispatch'
-        id: scan
+        id: full-scan
         run: PYTHONPATH=${{ github.workspace }}/ai-sast python -m src.main.full_scan --max-workers 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post PR Comment with Results
-        if: always() && github.event_name == 'pull_request' && steps.scan.outcome != 'skipped'
+        if: always() && github.event_name == 'pull_request' && steps.pr-scan.outcome != 'skipped'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
