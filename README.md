@@ -94,6 +94,7 @@ Feedback collection is included in the same workflow file (see Integrate in your
 
 - **Auth errors:** Service account needs "Vertex AI User" role; `GOOGLE_CREDENTIALS` must be the full JSON key.
 - **No PR comment:** Ensure the PR targets the branch set by `AI_SAST_BASE_BRANCH` (default `main`).
+- **Feedback not triggering:** The feedback job runs from your **default branch** (e.g. `main`). Make sure `ai-sast.yml` is merged to that branch—if it only exists on a feature branch, checking boxes in the PR comment won’t trigger the workflow.
 - **Using a fork:** Set repository variable `AI_SAST_REPO` to your `org/ai-sast`.
 
 ## Support

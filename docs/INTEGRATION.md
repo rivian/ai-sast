@@ -38,4 +38,5 @@ The workflow checks out **`rivian/ai-sast`** by default. That’s it—PR scan r
 
 - **“repository not found” or checkout fails:** You may be using a fork; set `AI_SAST_REPO` to your `org/ai-sast`.
 - **No PR comment:** Check that the PR targets the branch set by `AI_SAST_BASE_BRANCH` (or `main`). Check the “Run AI-SAST PR Scan” step logs.
+- **Feedback not triggering when you check boxes:** The `issue_comment` event runs the workflow from your **default branch** (e.g. `main`). Ensure `ai-sast.yml` is committed and merged to that branch—if the file exists only on a feature branch, feedback collection will not run.
 - **Auth errors:** Ensure the service account has the “Vertex AI User” role and that `GOOGLE_CREDENTIALS` is the **full** JSON key (not a path).

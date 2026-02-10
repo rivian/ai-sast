@@ -1,6 +1,9 @@
 # Run AI-SAST in YOUR repo on YOUR runners. Your code never runs on ai-sast infrastructure.
 # One file: PR scan, full scan, and feedback collection when developers check boxes in PR comments.
 #
+# Important: For feedback collection to trigger, this file must be on your default branch (e.g. main).
+# GitHub runs issue_comment workflows from the default branch only.
+#
 # Required: copy this file as .github/workflows/ai-sast.yml, add secrets:
 #   GOOGLE_CLOUD_PROJECT, GOOGLE_CREDENTIALS
 # Default: checks out rivian/ai-sast. Optional: set AI_SAST_REPO (e.g. for a fork);
@@ -17,7 +20,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  issues: read
+  issues: write   # needed for collect-feedback job to post thank-you comment
 
 jobs:
   ai-sast:
@@ -118,6 +121,8 @@ jobs:
   collect-feedback:
     name: Process Feedback from PR Comment
     runs-on: ubuntu-latest
+    # Runs when a PR comment is created or edited and contains the AI-SAST scan heading.
+    # Requires this workflow file to be on the repo default branch (e.g. main).
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '🤖 AI-SAST Security Scan')
 
     env:
