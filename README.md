@@ -78,13 +78,13 @@ When the PR scan finds issues, it posts a comment like this:
 
 ## Feedback loop
 
-Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is stored (SQLite by default, or Databricks) and included in future scan prompts so the AI gets more accurate over time.
+Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is **stored in a database** (SQLite by default, or Databricks) and **included in the prompt sent to Vertex AI** on future scans so the model can improve accuracy (e.g. avoid repeating false positives and pay attention to patterns similar to confirmed vulnerabilities).
 
 **How it works:**
 1. **PR scan** posts a comment with checkboxes next to each finding.
 2. **Developer** checks one box per finding (True Positive or False Positive).
-3. **collect-feedback** workflow runs when the comment is edited and stores the feedback.
-4. **Future scans** use this history in the AI context to reduce false positives and focus on real issues.
+3. **collect-feedback** workflow runs when the comment is edited and **stores feedback in the database**.
+4. **Future scans** load that feedback and **add it to the Vertex AI (Gemini) prompt** as context, so the AI gets more accurate over time.
 
 Feedback collection is included in the same workflow file (see Integrate in your repository). No extra configuration needed for SQLite.
 

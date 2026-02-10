@@ -33,12 +33,23 @@ jobs:
       GOOGLE_LOCATION: us-central1
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
       AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
+      # SQLite feedback DB in workspace; cached so future scans retrieve feedback and send it to Vertex AI.
+      AI_SAST_DB_PATH: ${{ github.workspace }}/.ai-sast-db/scans.db
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Cache feedback database
+        uses: actions/cache@v4
+        with:
+          path: .ai-sast-db
+          key: ai-sast-feedback-${{ github.repository }}
+
+      - name: Prepare feedback DB directory
+        run: mkdir -p .ai-sast-db
 
       - name: Checkout AI-SAST
         uses: actions/checkout@v4
@@ -123,11 +134,13 @@ jobs:
     runs-on: ubuntu-latest
     # Runs when a PR comment is created or edited and contains the AI-SAST scan heading.
     # Requires this workflow file to be on the repo default branch (e.g. main).
+    # Stores feedback in SQLite at AI_SAST_DB_PATH; same DB is cached and used by ai-sast job to retrieve feedback and send it to Vertex AI on future scans.
     if: github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '🤖 AI-SAST Security Scan')
 
     env:
       GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
       GOOGLE_LOCATION: us-central1
+      AI_SAST_DB_PATH: ${{ github.workspace }}/.ai-sast-db/scans.db
       AI_SAST_DATABRICKS_HOST: ${{ secrets.AI_SAST_DATABRICKS_HOST }}
       AI_SAST_DATABRICKS_HTTP_PATH: ${{ secrets.AI_SAST_DATABRICKS_HTTP_PATH }}
       AI_SAST_DATABRICKS_TOKEN: ${{ secrets.AI_SAST_DATABRICKS_TOKEN }}
@@ -136,6 +149,20 @@ jobs:
       AI_SAST_DATABRICKS_TABLE: ${{ secrets.AI_SAST_DATABRICKS_TABLE }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache feedback database
+        uses: actions/cache@v4
+        with:
+          path: .ai-sast-db
+          key: ai-sast-feedback-${{ github.repository }}
+
+      - name: Prepare feedback DB directory
+        run: mkdir -p .ai-sast-db
+
       - name: Checkout AI-SAST
         uses: actions/checkout@v4
         with:
@@ -168,3 +195,36 @@ jobs:
               issue_number: context.issue.number,
               body: '✅ Thank you for your feedback! It has been recorded and will help improve future AI-SAST scans.'
             });
+
+  view-feedback-cache:
+    name: View feedback records in cache
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore feedback database cache
+        uses: actions/cache/restore@v4
+        id: feedback-cache
+        with:
+          path: .ai-sast-db
+          key: ai-sast-feedback-${{ github.repository }}
+
+      - name: Show cache status and feedback records
+        run: |
+          echo "## Feedback cache for ${{ github.repository }}"
+          echo ""
+          if [ -f .ai-sast-db/scans.db ]; then
+            echo "Cache hit: database found."
+            echo ""
+            echo "### Row counts"
+            sqlite3 .ai-sast-db/scans.db "SELECT 'feedback: ' || COUNT(*) FROM feedback; SELECT 'scan_results: ' || COUNT(*) FROM scan_results;" 2>/dev/null || true
+            echo ""
+            echo "### Recent feedback"
+            sqlite3 -header -column .ai-sast-db/scans.db "SELECT repository, status, substr(issue,1,50) issue, substr(file_path,1,35) file_path, timestamp FROM feedback ORDER BY timestamp DESC LIMIT 30;" 2>/dev/null || echo "(no records yet)"
+          else
+            echo "Cache miss or empty: no database file. Run a PR scan, then collect feedback (check boxes in a PR comment) to populate the cache."
+          fi

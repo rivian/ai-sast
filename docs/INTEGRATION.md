@@ -9,7 +9,7 @@ Run AI-SAST (PR scan + full scan) **in your repo on your runners**. The workflow
 - **From this repo:** [`.github/workflows/ai-sast.yml`](../.github/workflows/ai-sast.yml)
 - **Save as:** `.github/workflows/ai-sast.yml` in **your** repository.
 
-This single file runs PR scan, full scan, and feedback collection (when developers check boxes in PR comments).
+This single file runs PR scan, full scan, and feedback collection (when developers check boxes in PR comments). Feedback is stored in a database and included in the Vertex AI prompt on future scans to improve accuracy.
 
 ### 2. Add Google secrets
 
