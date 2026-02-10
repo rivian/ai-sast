@@ -1,0 +1,112 @@
+# Run AI-SAST in YOUR repo on YOUR runners. Your code never runs on ai-sast infrastructure.
+#
+# Required: copy this file as .github/workflows/ai-sast.yml, add secrets:
+#   GOOGLE_CLOUD_PROJECT, GOOGLE_CREDENTIALS
+# Default: checks out rivian/ai-sast. Optional: set AI_SAST_REPO (e.g. for a fork);
+#   AI_SAST_BASE_BRANCH (default: main); AI_SAST_REF (default: main); runs-on for self-hosted.
+
+name: AI-SAST
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-sast:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.base_ref == vars.AI_SAST_BASE_BRANCH || (vars.AI_SAST_BASE_BRANCH == '' && github.base_ref == 'main')))
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    env:
+      GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+      GOOGLE_LOCATION: us-central1
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
+      AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout AI-SAST
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.AI_SAST_REPO || 'rivian/ai-sast' }}
+          path: ai-sast
+          ref: ${{ vars.AI_SAST_REF || 'main' }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install --upgrade pip && pip install -r ai-sast/requirements.txt
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+      - name: Run AI-SAST PR Scan
+        if: github.event_name == 'pull_request'
+        id: scan
+        run: PYTHONPATH=${{ github.workspace }}/ai-sast python -m src.main.pr_scan
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run AI-SAST Full Scan
+        if: github.event_name == 'workflow_dispatch'
+        id: scan
+        run: PYTHONPATH=${{ github.workspace }}/ai-sast python -m src.main.full_scan --max-workers 1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post PR Comment with Results
+        if: always() && github.event_name == 'pull_request' && steps.scan.outcome != 'skipped'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('pr_comment.md')) {
+              console.log('No pr_comment.md found');
+              return;
+            }
+            const report = fs.readFileSync('pr_comment.md', 'utf8');
+            if (!report || !report.trim()) {
+              console.log('pr_comment.md is empty');
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
+            console.log('PR comment posted');
+
+      - name: Upload PR scan reports
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-sast-pr-scan-reports
+          path: |
+            ai_sast_pr_scan_report_*.html
+            pr_comment.md
+          retention-days: 30
+
+      - name: Upload full scan reports
+        if: always() && github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-sast-full-scan-report
+          path: |
+            ai_sast_full_scan_report_*.html
+            ai_sast_full_scan_report_*.txt
+          retention-days: 30

@@ -245,7 +245,7 @@ Developer reviews PR comment
 
 ### Authentication
 - **Local Development:** `gcloud auth application-default login`
-- **GitHub Actions:** Service account JSON via `GOOGLE_TOKEN` secret
+- **GitHub Actions:** Service account JSON via `GOOGLE_CREDENTIALS` repository secret (workflow auth step)
 - **Ollama:** No authentication (local only)
 
 ### Secrets Management
