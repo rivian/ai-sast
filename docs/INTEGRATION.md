@@ -9,6 +9,8 @@ Run AI-SAST (PR scan + full scan) **in your repo on your runners**. The workflow
 - **From this repo:** [`.github/workflows/ai-sast.yml`](../.github/workflows/ai-sast.yml)
 - **Save as:** `.github/workflows/ai-sast.yml` in **your** repository.
 
+This single file runs PR scan, full scan, and feedback collection (when developers check boxes in PR comments).
+
 ### 2. Add Google secrets
 
 In your repository: **Settings → Secrets and variables → Actions → Secrets**
@@ -18,7 +20,7 @@ In your repository: **Settings → Secrets and variables → Actions → Secrets
 | `GOOGLE_CLOUD_PROJECT` | Your GCP project ID |
 | `GOOGLE_CREDENTIALS` | Service account JSON (full contents of the key file) |
 
-The workflow checks out **`rivian/ai-sast`** by default. That’s it—PR scan runs on pull requests (when base branch matches); full scan runs when you click “Run workflow” in the Actions tab.
+The workflow checks out **`rivian/ai-sast`** by default. That’s it—PR scan runs on pull requests (when base branch matches), full scan (manual "Run workflow"), and feedback collection (when a PR comment with the AI-SAST scan is edited and checkboxes are used).
 
 ## Optional
 
