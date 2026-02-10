@@ -8,11 +8,43 @@
 #   GOOGLE_CLOUD_PROJECT, GOOGLE_CREDENTIALS
 # Default: checks out rivian/ai-sast. Optional: set AI_SAST_REPO (e.g. for a fork);
 #   AI_SAST_BASE_BRANCH (default: main); AI_SAST_REF (default: main); runs-on for self-hosted.
+#
+# PR scan runs only when the PR diff touches supported file extensions (see paths below).
+# workflow_dispatch and issue_comment have no path filter.
 
 name: AI-SAST
 
 on:
   pull_request:
+    paths:
+      - '**.py'
+      - '**.js'
+      - '**.ts'
+      - '**.jsx'
+      - '**.tsx'
+      - '**.java'
+      - '**.cpp'
+      - '**.c'
+      - '**.h'
+      - '**.hpp'
+      - '**.php'
+      - '**.rb'
+      - '**.go'
+      - '**.rs'
+      - '**.cs'
+      - '**.sql'
+      - '**.sh'
+      - '**.bash'
+      - '**.graphql'
+      - '**.gql'
+      - '**.swift'
+      - '**.kt'
+      - '**.kts'
+      - '**.scala'
+      - '**.lua'
+      - '**.pl'
+      - '**.r'
+      - '**.R'
   workflow_dispatch:
   issue_comment:
     types: [created, edited]
