@@ -46,6 +46,15 @@ on:
       - '**.r'
       - '**.R'
   workflow_dispatch:
+    inputs:
+      run_only:
+        description: 'What to run'
+        required: false
+        default: 'full_scan'
+        type: choice
+        options:
+          - full_scan
+          - view_feedback_only
   issue_comment:
     types: [created, edited]
 
@@ -56,7 +65,7 @@ permissions:
 
 jobs:
   ai-sast:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (github.base_ref == vars.AI_SAST_BASE_BRANCH || (vars.AI_SAST_BASE_BRANCH == '' && github.base_ref == 'main')))
+    if: (github.event_name == 'workflow_dispatch' && (github.event.inputs.run_only == '' || github.event.inputs.run_only == 'full_scan')) || (github.event_name == 'pull_request' && (github.base_ref == vars.AI_SAST_BASE_BRANCH || (vars.AI_SAST_BASE_BRANCH == '' && github.base_ref == 'main')))
     runs-on: ubuntu-latest
     continue-on-error: true
 
@@ -231,6 +240,7 @@ jobs:
   view-feedback-cache:
     name: View feedback records in cache
     runs-on: ubuntu-latest
+    # Run when manually triggered (Run workflow). Use "View feedback records only" to run just this job.
     if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout repository
