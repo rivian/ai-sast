@@ -74,7 +74,13 @@ jobs:
       GOOGLE_LOCATION: us-central1
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
       AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
-      # SQLite feedback DB in workspace; cached so future scans retrieve feedback and send it to Vertex AI.
+      # LLM provider: vertex (default) or bedrock. For bedrock, set AWS_REGION and AWS credentials.
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'vertex' }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-opus-4-5-20251101-v1:0' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      # SQLite feedback DB in workspace; cached so future scans retrieve feedback and send it to the LLM.
       AI_SAST_DB_PATH: ${{ github.workspace }}/.ai-sast-db/scans.db
 
     steps:

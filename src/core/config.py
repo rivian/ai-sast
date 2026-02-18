@@ -1,15 +1,20 @@
 """
-Configuration file for AI-SAST LLM backends (Vertex AI, Ollama)
+Configuration file for AI-SAST LLM backends (Vertex AI, AWS Bedrock, Ollama)
 """
 
 import os
 
 # ============================================================================
-# LLM Backend Selection
+# LLM Provider / Backend Selection
 # ============================================================================
 
-# LLM_BACKEND: Choose which LLM backend to use
-# Options: "vertex" (Google Vertex AI) or "ollama" (local open-source)
+# LLM_PROVIDER: Cloud LLM provider for scanning
+# Options: "vertex" (Google Vertex AI, default) or "bedrock" (AWS Bedrock Claude)
+# Default: "vertex"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "vertex").lower()
+
+# LLM_BACKEND: Legacy / additional backend; "ollama" for local open-source
+# Options: "vertex" (ignored if LLM_PROVIDER set) or "ollama" (local)
 # Default: "vertex"
 LLM_BACKEND = os.getenv("LLM_BACKEND", "vertex").lower()
 
@@ -50,6 +55,17 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 # Recommended: "qwen2.5-coder:14b", "codellama:13b", "llama3.1:8b"
 # Default: "qwen2.5-coder:14b" (best balance for code security analysis)
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
+
+# ============================================================================
+# AWS Bedrock Configuration (when LLM_PROVIDER=bedrock)
+# ============================================================================
+
+# AWS_REGION: AWS region for Bedrock (e.g. us-east-1)
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+
+# BEDROCK_MODEL_ID: Claude model ID on Bedrock
+# Example: "anthropic.claude-opus-4-5-20251101-v1:0", "anthropic.claude-opus-4-6-v1"
+BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-opus-4-5-20251101-v1:0")
 
 # ============================================================================
 # Legacy/Shared Configuration

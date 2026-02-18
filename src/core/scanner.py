@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Security vulnerability scanner using AI (Vertex AI or Ollama)
+Security vulnerability scanner using AI (Vertex AI, AWS Bedrock, or Ollama)
 
 This module provides functionality to scan source code for security vulnerabilities
-using either Google Cloud Vertex AI or local Ollama models.
+using Google Cloud Vertex AI, AWS Bedrock (Claude), or local Ollama models.
 """
 
 import sys
@@ -20,18 +20,26 @@ import time
 import logging
 
 from .config import (
-    LLM_BACKEND, 
+    LLM_PROVIDER,
+    LLM_BACKEND,
     PROJECT_ID, LOCATION, GEMINI_MODEL,
-    OLLAMA_BASE_URL, OLLAMA_MODEL
+    OLLAMA_BASE_URL, OLLAMA_MODEL,
+    AWS_REGION, BEDROCK_MODEL_ID,
 )
 
-# Import LLM clients based on backend
+# Import LLM clients based on provider/backend
 if LLM_BACKEND == "ollama":
     from ..integrations.ollama import OllamaClient
     VertexAIClient = None
+    BedrockClaudeClient = None
+elif LLM_PROVIDER == "bedrock":
+    from ..integrations.bedrock import BedrockClaudeClient
+    from .vertex import VertexAIClient  # may be used for fallback
+    OllamaClient = None
 else:
     from .vertex import VertexAIClient
     OllamaClient = None
+    BedrockClaudeClient = None
 
 # Optional integrations - import only if available
 try:
@@ -125,7 +133,7 @@ Format your response for each finding as:
             location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
-        # Initialize LLM client based on backend
+        # Initialize LLM client based on LLM_PROVIDER (vertex | bedrock) or LLM_BACKEND (ollama)
         if LLM_BACKEND == "ollama":
             print(f"🔧 LLM Backend: Ollama (local)")
             self.client = OllamaClient(
@@ -133,8 +141,16 @@ Format your response for each finding as:
                 model=OLLAMA_MODEL
             )
             self.backend = "ollama"
+        elif LLM_PROVIDER == "bedrock":
+            print(f"🔧 LLM Provider: AWS Bedrock (Claude)")
+            self.client = BedrockClaudeClient(
+                region_name=AWS_REGION,
+                model_id=BEDROCK_MODEL_ID,
+            )
+            print(f"🤖 Using Bedrock model: {BEDROCK_MODEL_ID}")
+            self.backend = "bedrock"
         else:
-            print(f"🔧 LLM Backend: Vertex AI (Google Cloud)")
+            print(f"🔧 LLM Provider: Vertex AI (Google Cloud)")
             self.client = VertexAIClient(
                 project_id or PROJECT_ID,
                 location or LOCATION
@@ -352,9 +368,10 @@ Format your response for each finding as:
             try:
                 # Call LLM based on backend
                 if self.backend == "ollama":
-                    analysis = self.client.generate(prompt, temperature=0.2)
+                    analysis = self.client.generate_with_ollama(prompt, temperature=0.2)
+                elif self.backend == "bedrock":
+                    analysis = self.client.generate_with_bedrock(prompt, model_name=BEDROCK_MODEL_ID)
                 else:
-                    # Vertex AI backend
                     analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
                 
                 return {

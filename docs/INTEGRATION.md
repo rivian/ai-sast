@@ -24,6 +24,7 @@ The workflow checks out **`rivian/ai-sast`** by default. That’s it—PR scan r
 
 ## Optional
 
+- **LLM provider:** Default is **Vertex AI** (Gemini). To use **AWS Bedrock (Claude Opus)** set variable **`LLM_PROVIDER`** = `bedrock`, and set **`AWS_REGION`** (e.g. `us-east-1`), **`BEDROCK_MODEL_ID`** (e.g. `anthropic.claude-opus-4-5-20251101-v1:0`). Add AWS credentials as secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) or use an IAM role on the runner.
 - **Using a fork:** Set repository variable **`AI_SAST_REPO`** (e.g. `your-org/ai-sast`) to checkout your fork instead of `rivian/ai-sast`.
 - **Default branch for PR scan:** Add variable **`AI_SAST_BASE_BRANCH`** (e.g. `main`, `master`, `develop`). Default is `main` if unset.
 - **Scanner ref:** Add variable **`AI_SAST_REF`** (e.g. `main`, `v1.0`) to pin the ai-sast version. Default is `main`.

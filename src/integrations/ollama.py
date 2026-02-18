@@ -48,15 +48,15 @@ class OllamaClient:
             print(f"   Make sure Ollama is running: https://ollama.com/")
             raise
 
-    def generate(self, prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None) -> str:
+    def generate_with_ollama(self, prompt: str, temperature: float = 0.2, max_tokens: Optional[int] = None) -> str:
         """
-        Generate text using Ollama model
-        
+        Generate text using Ollama model (Ollama-specific API for scanning).
+
         Args:
             prompt: Input text prompt
             temperature: Creativity level (0.0-1.0, default: 0.2 for security analysis)
             max_tokens: Maximum tokens in response (optional)
-            
+
         Returns:
             Generated text response
         """

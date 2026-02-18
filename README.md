@@ -8,7 +8,7 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 
 ## Features
 
-- **Vertex AI (Gemini)** or **Ollama** backends
+- **Vertex AI (Gemini)** (default), **AWS Bedrock (Claude Opus)**, or **Ollama** backends
 - **PR scan**: Scans changed files on pull requests; posts findings as PR comments
 - **Full scan**: Manual run to scan the entire repository
 - **Your runners**: Workflow runs in your repo (e.g. self-hosted); your code stays on your infrastructure
@@ -20,7 +20,7 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 ![AI-SAST Architecture](docs/images/architecture.png)
 
 1. **Trigger**: Pull request or manual "Run workflow"
-2. **Scan**: Code is analyzed by Vertex AI (Gemini) or Ollama
+2. **Scan**: Code is analyzed by Vertex AI (Gemini), AWS Bedrock (Claude), or Ollama
 3. **Results**: PR comments and HTML/text report artifacts
 
 📖 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
@@ -41,6 +41,7 @@ The workflow checks out **`rivian/ai-sast`** at runtime. One file runs **PR scan
 
 ## Optional configuration
 
+- **LLM provider (default: Vertex):** Set `LLM_PROVIDER=vertex` (default) for Google Vertex AI (Gemini), or `LLM_PROVIDER=bedrock` for AWS Bedrock (Claude Opus). For Bedrock, set `AWS_REGION` (e.g. `us-east-1`) and `BEDROCK_MODEL_ID` (e.g. `anthropic.claude-opus-4-5-20251101-v1:0`); use AWS credentials (e.g. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` or IAM role).
 - **Historical vulnerabilities (highly recommended):** Add Jira context so the LLM sees past vulnerability patterns and improves accuracy. Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` as repository variables or in the workflow env.
 - **Severity filter**: Set variable `AI_SAST_SEVERITY` (e.g. `critical,high`). Default: `critical,high`.
 
