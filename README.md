@@ -127,12 +127,9 @@ When the PR scan finds issues, it posts a comment like this:
 
 **Validator proof:** User input is concatenated into the query without sanitization; a malicious payload could execute arbitrary SQL.
 
-**Remediation:**
-````
-Use parameterized queries...
+**Remediation:** Use parameterized queries...
 ````
 
-</details>
 ```
 
 ## Feedback loop
