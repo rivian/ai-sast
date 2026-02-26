@@ -122,14 +122,16 @@ When the PR scan finds issues, it posts a comment like this:
 **CVSS Vector**: `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N`
 
 <details><summary>📋 Click to see details, risk, and remediation</summary>
+
 **Risk:** Attacker could manipulate SQL queries...
 
 **Validator proof:** User input is concatenated into the query without sanitization; a malicious payload could execute arbitrary SQL.
 
 **Remediation:**
-```
+````
 Use parameterized queries...
-```
+````
+
 </details>
 ```
 
