@@ -22,17 +22,19 @@ import logging
 from .config import (
     LLM_PROVIDER,
     LLM_BACKEND,
+    AI_SAST_LLM,
     PROJECT_ID, LOCATION, GEMINI_MODEL,
     OLLAMA_BASE_URL, OLLAMA_MODEL,
     AWS_REGION, BEDROCK_MODEL_ID,
 )
 
-# Import LLM clients based on provider/backend
-if LLM_BACKEND == "ollama":
+# Import LLM clients based on provider/backend (AI_SAST_LLM takes precedence for initial scan)
+_SCAN_LLM = AI_SAST_LLM if AI_SAST_LLM else (LLM_BACKEND if LLM_BACKEND == "ollama" else LLM_PROVIDER)
+if _SCAN_LLM == "ollama":
     from ..integrations.ollama import OllamaClient
     VertexAIClient = None
     BedrockClaudeClient = None
-elif LLM_PROVIDER == "bedrock":
+elif _SCAN_LLM == "bedrock":
     from ..integrations.bedrock import BedrockClaudeClient
     from .vertex import VertexAIClient  # may be used for fallback
     OllamaClient = None
@@ -133,29 +135,27 @@ Format your response for each finding as:
             location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
-        # Initialize LLM client based on LLM_PROVIDER (vertex | bedrock) or LLM_BACKEND (ollama)
-        if LLM_BACKEND == "ollama":
-            print(f"🔧 LLM Backend: Ollama (local)")
+        # Initialize LLM client based on AI_SAST_LLM (vertex | bedrock | ollama)
+        if _SCAN_LLM == "ollama":
+            print(f"🔧 Initial scan LLM: Ollama (local), model: {OLLAMA_MODEL}")
             self.client = OllamaClient(
                 base_url=OLLAMA_BASE_URL,
                 model=OLLAMA_MODEL
             )
             self.backend = "ollama"
-        elif LLM_PROVIDER == "bedrock":
-            print(f"🔧 LLM Provider: AWS Bedrock (Claude)")
+        elif _SCAN_LLM == "bedrock":
+            print(f"🔧 Initial scan LLM: AWS Bedrock (Claude), model: {BEDROCK_MODEL_ID}")
             self.client = BedrockClaudeClient(
                 region_name=AWS_REGION,
                 model_id=BEDROCK_MODEL_ID,
             )
-            print(f"🤖 Using Bedrock model: {BEDROCK_MODEL_ID}")
             self.backend = "bedrock"
         else:
-            print(f"🔧 LLM Provider: Vertex AI (Google Cloud)")
+            print(f"🔧 Initial scan LLM: Vertex AI (Gemini), model: {GEMINI_MODEL}")
             self.client = VertexAIClient(
                 project_id or PROJECT_ID,
                 location or LOCATION
             )
-            print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
             self.backend = "vertex"
         
         # CI_PROJECT_URL (GitLab) or GITHUB_REPOSITORY (GitHub): Repository identifier

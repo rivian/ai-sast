@@ -106,6 +106,14 @@ class ScanDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_repository ON feedback(repository)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_feedback_timestamp ON feedback(timestamp)')
+
+        # Migration: add validator columns to scan_results if missing
+        cursor.execute('PRAGMA table_info(scan_results)')
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'validator_llm' not in columns:
+            cursor.execute('ALTER TABLE scan_results ADD COLUMN validator_llm TEXT')
+        if 'validator_result' not in columns:
+            cursor.execute('ALTER TABLE scan_results ADD COLUMN validator_result TEXT')
         
         conn.commit()
         conn.close()
@@ -149,6 +157,31 @@ class ScanDatabase:
             return True
         except Exception as e:
             logger.error(f"Error storing scan result: {e}")
+            return False
+
+    def update_validator_result(
+        self,
+        scan_id: str,
+        repo_url: str,
+        vuln_id: str,
+        validator_llm: str,
+        validator_result: str,
+    ) -> bool:
+        """Update a scan result row with validator LLM and result (reasoning, false_positive, or error)."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE scan_results
+                SET validator_llm = ?, validator_result = ?
+                WHERE scan_id = ? AND repository = ? AND vuln_id = ?
+            ''', (validator_llm, validator_result, scan_id, repo_url, vuln_id))
+            conn.commit()
+            updated = cursor.rowcount > 0
+            conn.close()
+            return updated
+        except Exception as e:
+            logger.error(f"Error updating validator result: {e}")
             return False
     
     def store_batch_scan_results(

@@ -8,7 +8,7 @@ import os
 # LLM Provider / Backend Selection
 # ============================================================================
 
-# LLM_PROVIDER: Cloud LLM provider for scanning
+# LLM_PROVIDER: Cloud LLM provider for scanning (legacy; prefer AI_SAST_LLM)
 # Options: "vertex" (Google Vertex AI, default) or "bedrock" (AWS Bedrock Claude)
 # Default: "vertex"
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "vertex").lower()
@@ -17,6 +17,16 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "vertex").lower()
 # Options: "vertex" (ignored if LLM_PROVIDER set) or "ollama" (local)
 # Default: "vertex"
 LLM_BACKEND = os.getenv("LLM_BACKEND", "vertex").lower()
+
+# AI_SAST_LLM: LLM provider for the initial security scan
+# Options: "vertex" (Gemini), "bedrock" (Claude), "ollama" (local)
+# Default: "vertex"
+AI_SAST_LLM = os.getenv("AI_SAST_LLM", os.getenv("LLM_PROVIDER", "vertex")).lower()
+
+# AI_SAST_VALIDATOR_LLM: LLM provider for validating findings (true positive check)
+# Options: "vertex", "bedrock", "ollama". If not configured or on error, validation is skipped.
+# Default: "bedrock"
+AI_SAST_VALIDATOR_LLM = os.getenv("AI_SAST_VALIDATOR_LLM", "bedrock").lower()
 
 # ============================================================================
 # Vertex AI Configuration (Google Cloud)
@@ -30,10 +40,10 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
 # Example: "us-central1", "us-east1", "europe-west1", "asia-southeast1"
 LOCATION = os.getenv("GOOGLE_LOCATION", "us-central1")
 
-# GEMINI_MODEL: Gemini model to use for security analysis
+# GEMINI_MODEL: Gemini model to use for initial security scan (when AI_SAST_LLM=vertex)
 # Example: "gemini-2.0-flash-exp", "gemini-1.5-pro", "gemini-2.5-pro"
-# Default: "gemini-2.0-flash-exp" (fast, low-cost, good for most scans)
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+# Default: "gemini-2.5-pro"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 
 # GOOGLE_APPLICATION_CREDENTIALS: Path to service account key file (optional)
 # Example: "/path/to/service-account-key.json" or "~/.gcp/my-project-key.json"
@@ -63,9 +73,16 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
 # AWS_REGION: AWS region for Bedrock (e.g. us-east-1)
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
 
-# BEDROCK_MODEL_ID: Claude model ID on Bedrock
+# BEDROCK_MODEL_ID: Claude model ID on Bedrock (for initial scan when AI_SAST_LLM=bedrock)
 # Example: "anthropic.claude-opus-4-5-20251101-v1:0", "anthropic.claude-opus-4-6-v1"
 BEDROCK_MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-opus-4-5-20251101-v1:0")
+
+# AI_SAST_VALIDATOR_BEDROCK_MODEL_ID: Bedrock model for validating findings (when AI_SAST_VALIDATOR_LLM=bedrock)
+# Default: Claude 3.5 Sonnet
+AI_SAST_VALIDATOR_BEDROCK_MODEL_ID = os.getenv("AI_SAST_VALIDATOR_BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+
+# AI_SAST_VALIDATOR_GEMINI_MODEL: Gemini model for validating findings (when AI_SAST_VALIDATOR_LLM=vertex)
+AI_SAST_VALIDATOR_GEMINI_MODEL = os.getenv("AI_SAST_VALIDATOR_GEMINI_MODEL", os.getenv("GEMINI_MODEL", "gemini-2.5-pro"))
 
 # ============================================================================
 # Legacy/Shared Configuration

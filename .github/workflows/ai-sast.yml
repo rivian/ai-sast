@@ -72,12 +72,16 @@ jobs:
     env:
       GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
       GOOGLE_LOCATION: us-central1
-      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.0-flash-exp' }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-pro' }}
       AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
-      # LLM provider: vertex (default) or bedrock. For bedrock, set AWS_REGION and AWS credentials.
+      # Initial scan LLM: vertex (default), bedrock, or ollama.
+      AI_SAST_LLM: ${{ vars.AI_SAST_LLM || vars.LLM_PROVIDER || 'vertex' }}
       LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'vertex' }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-opus-4-5-20251101-v1:0' }}
+      # Validator LLM: only validated (true positive) findings are posted in PR comment. Default: bedrock.
+      AI_SAST_VALIDATOR_LLM: ${{ vars.AI_SAST_VALIDATOR_LLM || 'bedrock' }}
+      AI_SAST_VALIDATOR_BEDROCK_MODEL_ID: ${{ vars.AI_SAST_VALIDATOR_BEDROCK_MODEL_ID || 'anthropic.claude-3-5-sonnet-20241022-v2:0' }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       # SQLite feedback DB in workspace; cached so future scans retrieve feedback and send it to the LLM.

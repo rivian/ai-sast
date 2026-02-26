@@ -39,11 +39,63 @@ The workflow checks out **`rivian/ai-sast`** at runtime. One file runs **PR scan
 
 📚 **Full guide:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
-## Optional configuration
+## Environment variables
 
-- **LLM provider (default: Vertex):** Set `LLM_PROVIDER=vertex` (default) for Google Vertex AI (Gemini), or `LLM_PROVIDER=bedrock` for AWS Bedrock (Claude Opus). For Bedrock, set `AWS_REGION` (e.g. `us-east-1`) and `BEDROCK_MODEL_ID` (e.g. `anthropic.claude-opus-4-5-20251101-v1:0`); use AWS credentials (e.g. `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` or IAM role).
-- **Historical vulnerabilities (highly recommended):** Add Jira context so the LLM sees past vulnerability patterns and improves accuracy. Set `JIRA_SERVER`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT_KEY` as repository variables or in the workflow env.
-- **Severity filter**: Set variable `AI_SAST_SEVERITY` (e.g. `critical,high`). Default: `critical,high`.
+All configuration is driven by environment variables. The table below lists supported variables, their description, and default value (if any). Set them as repository **Secrets** or **Variables** in GitHub (Settings → Secrets and variables → Actions), or in the workflow `env` block.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| **Workflow & scan behavior** | | |
+| `AI_SAST_REPO` | GitHub repo to checkout (e.g. `org/ai-sast` or a fork). | `rivian/ai-sast` (in workflow) |
+| `AI_SAST_BASE_BRANCH` | Branch that triggers PR scan; PRs targeting this branch are scanned. | `main` |
+| `AI_SAST_SEVERITY` | Comma-separated severities to include in PR comments (e.g. `critical,high,medium`). | `critical,high` |
+| `AI_SAST_EXCLUDE_PATHS` | Comma-separated path keywords to exclude from scanning (e.g. `test,vendor,mock`). | — |
+| `AI_SAST_CUSTOM_PROMPT` | Extra instructions appended to the scan prompt (e.g. focus on certain vuln types). | — |
+| `AI_SAST_STORE_FINDINGS` | When `true`, store scan findings (and validator results) in the database. | `false` |
+| `AI_SAST_DB_PATH` | Path to SQLite database for feedback and optional scan storage. | `~/.ai-sast/scans.db` |
+| **Initial scan LLM** | | |
+| `AI_SAST_LLM` | LLM for the initial security scan: `vertex`, `bedrock`, or `ollama`. | `vertex` |
+| `LLM_PROVIDER` | Legacy; same effect as `AI_SAST_LLM` when `AI_SAST_LLM` is not set. | `vertex` |
+| `LLM_BACKEND` | Legacy; use `ollama` for local Ollama. | `vertex` |
+| **Validator LLM** | | |
+| `AI_SAST_VALIDATOR_LLM` | LLM to validate findings (true/false positive): `vertex`, `bedrock`, or `ollama`. Only validated true positives are posted in the PR. If unset or error, all findings are posted. | `bedrock` |
+| `AI_SAST_VALIDATOR_BEDROCK_MODEL_ID` | Bedrock model used when validator is `bedrock`. | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| `AI_SAST_VALIDATOR_GEMINI_MODEL` | Gemini model used when validator is `vertex`. | same as `GEMINI_MODEL` |
+| **Vertex AI (Google)** | | |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud project ID (required for Vertex). | — |
+| `GOOGLE_CREDENTIALS` | Service account JSON (secret); used by workflow for auth. | — |
+| `GOOGLE_LOCATION` | Vertex AI region (e.g. `us-central1`). | `us-central1` |
+| `GEMINI_MODEL` | Gemini model for initial scan when `AI_SAST_LLM=vertex`. | `gemini-2.5-pro` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to service account key file (alternative to `GOOGLE_TOKEN`). | — |
+| `GOOGLE_TOKEN` | Raw service account JSON or access token (alternative to file path). | — |
+| **AWS Bedrock** | | |
+| `AWS_REGION` | AWS region for Bedrock (e.g. `us-east-1`). | `us-east-1` |
+| `BEDROCK_MODEL_ID` | Claude model for initial scan when `AI_SAST_LLM=bedrock`. | `anthropic.claude-opus-4-5-20251101-v1:0` |
+| **Ollama (local)** | | |
+| `OLLAMA_BASE_URL` | Ollama API base URL. | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Model name for scan or validator when using Ollama. | `qwen2.5-coder:14b` |
+| **Jira (historical context)** | | |
+| `JIRA_URL` | Jira server URL (e.g. `https://your.atlassian.net`). | — |
+| `JIRA_USERNAME` | Jira user email. | — |
+| `JIRA_API_TOKEN` | Jira API token (e.g. from id.atlassian.com). | — |
+| `JIRA_JQL_QUERY` | JQL query to fetch vulnerability tickets for context. | — |
+| **Feedback backend (Databricks)** | | |
+| `AI_SAST_FEEDBACK_BACKEND` | Set to `databricks` to use Databricks instead of SQLite for feedback. | (SQLite) |
+| `AI_SAST_DATABRICKS_HOST` | Databricks workspace hostname. | — |
+| `AI_SAST_DATABRICKS_HTTP_PATH` | SQL warehouse HTTP path. | — |
+| `AI_SAST_DATABRICKS_TOKEN` | Databricks personal access token. | — |
+| `AI_SAST_DATABRICKS_CATALOG` | Unity Catalog name. | — |
+| `AI_SAST_DATABRICKS_SCHEMA` | Schema name. | — |
+| `AI_SAST_DATABRICKS_TABLE` | Table name for feedback. | — |
+| **Webhook (notifications)** | | |
+| `AI_SAST_WEBHOOK_URL` | Webhook endpoint URL for scan notifications. | — |
+| `AI_SAST_WEBHOOK_SECRET` | Optional secret for HMAC signature. | — |
+| `AI_SAST_WEBHOOK_TYPE` | Webhook format: `slack`, `teams`, `discord`, or `generic`. | `generic` |
+| **Vector / logging** | | |
+| `AI_SAST_VECTOR_URL` | Vector/log aggregator endpoint URL. | — |
+| `AI_SAST_VECTOR_TOKEN` | Authentication token for the vector endpoint. | — |
+
+*Secrets (e.g. `GOOGLE_CREDENTIALS`, `JIRA_API_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) have no default and must be set in the repo.*
 
 ## Example PR comment
 
@@ -73,7 +125,13 @@ When the PR scan finds issues, it posts a comment like this:
 
 <details><summary>📋 Click to see details, risk, and remediation</summary>
 **Risk:** Attacker could manipulate SQL queries...
-**Fix:** Use parameterized queries...
+
+**Validator proof:** User input is concatenated into the query without sanitization; a malicious payload could execute arbitrary SQL.
+
+**Remediation:**
+```
+Use parameterized queries...
+```
 </details>
 ```
 
