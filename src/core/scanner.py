@@ -31,7 +31,7 @@ if AI_SAST_LLM == "ollama":
     from ..integrations.ollama import OllamaClient
     VertexAIClient = None
     BedrockClaudeClient = None
-elif _SCAN_LLM == "bedrock":
+elif AI_SAST_LLM == "bedrock":
     from ..integrations.bedrock import BedrockClaudeClient
     from .vertex import VertexAIClient  # may be used for fallback
     OllamaClient = None
