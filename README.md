@@ -131,7 +131,6 @@ When the PR scan finds issues, it posts a comment like this:
 ````
 
 ```
-
 ## Feedback loop
 
 Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is **stored in a database** (SQLite by default, or Databricks) and **included in the prompt sent to Vertex AI** on future scans so the model can improve accuracy (e.g. avoid repeating false positives and pay attention to patterns similar to confirmed vulnerabilities).
