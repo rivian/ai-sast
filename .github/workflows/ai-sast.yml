@@ -74,9 +74,8 @@ jobs:
       GOOGLE_LOCATION: us-central1
       GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-pro' }}
       AI_SAST_SEVERITY: ${{ vars.AI_SAST_SEVERITY || 'critical,high' }}
-      # Initial scan LLM: vertex (default), bedrock, or ollama.
-      AI_SAST_LLM: ${{ vars.AI_SAST_LLM || vars.LLM_PROVIDER || 'vertex' }}
-      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'vertex' }}
+      # Initial scan LLM: vertex (default), bedrock, or ollama
+      AI_SAST_LLM: ${{ vars.AI_SAST_LLM || 'vertex' }}
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       BEDROCK_MODEL_ID: ${{ vars.BEDROCK_MODEL_ID || 'anthropic.claude-opus-4-5-20251101-v1:0' }}
       # Validator LLM: only validated (true positive) findings are posted in PR comment. Default: bedrock.

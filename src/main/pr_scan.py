@@ -348,15 +348,24 @@ def main():
     
     # Generate markdown report for PR comment (optional)
     vulnerabilities_by_severity = html_generator._process_results_by_severity(scan_results)
+    allowed_severities = html_generator._get_allowed_severities()
+    # Only validate findings that can appear in the PR comment (per AI_SAST_SEVERITY)
+    findings_to_validate = {
+        sev: vulns for sev, vulns in vulnerabilities_by_severity.items()
+        if sev in allowed_severities
+    }
     total_vulns = sum(len(v) for v in vulnerabilities_by_severity.values())
+    vulns_to_validate_count = sum(len(v) for v in findings_to_validate.values())
 
     # Optional: validate findings with validator LLM; only post validated (true positive) in PR comment
     validated_vuln_ids = None
     validator_reasoning = None  # vuln_id -> 1-2 line proof for PR "Validator proof" section
     validator_llm_and_results = None  # (validator_llm_str, all_results_by_id) for DB
-    if total_vulns > 0:
+    if vulns_to_validate_count > 0:
         try:
-            validator_result = validate_findings(vulnerabilities_by_severity, repo_url=repo_url)
+            if vulns_to_validate_count < total_vulns:
+                print(f"🔧 Validator: validating {vulns_to_validate_count} finding(s) in severities {allowed_severities} (AI_SAST_SEVERITY); skipping {total_vulns - vulns_to_validate_count} outside scope.")
+            validator_result = validate_findings(findings_to_validate, repo_url=repo_url)
             if validator_result is None:
                 print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment.")
             else:
@@ -381,14 +390,11 @@ def main():
         except Exception as e:
             print(f"⚠️ Could not update validator results in database: {e}")
 
-    # Decide whether to post comment: if validator ran, post if any validated; else post if any critical/high
+    # Decide whether to post comment: if validator ran, post if any validated; else post if any finding in AI_SAST_SEVERITY
     if validated_vuln_ids is not None:
         should_post_comment = len(validated_vuln_ids) > 0
     else:
-        should_post_comment = bool(
-            vulnerabilities_by_severity.get("Critical") or
-            vulnerabilities_by_severity.get("High")
-        )
+        should_post_comment = vulns_to_validate_count > 0
 
     if should_post_comment:
         print("\n💬 Generating markdown report for PR comment...")
@@ -408,10 +414,10 @@ def main():
         print("✅ Markdown report saved to pr_comment.md")
         print("   Use this file to post a PR comment in your workflow")
     else:
-        if validated_vuln_ids is not None and total_vulns > 0:
+        if validated_vuln_ids is not None and vulns_to_validate_count > 0:
             print("\nℹ️  No findings validated as true positive; skipping PR comment.")
         else:
-            print("\nℹ️  No critical or high severity issues found.")
+            print(f"\nℹ️  No findings in configured severities ({', '.join(allowed_severities)}).")
     
     # Send webhook notification (optional)
     if WebhookClient:

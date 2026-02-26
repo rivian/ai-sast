@@ -3,7 +3,7 @@
 AWS Bedrock Claude API Client
 
 Integrates with Amazon Bedrock to invoke Anthropic Claude (e.g. Claude Opus)
-for security scanning. Uses the Messages API. Use by setting LLM_PROVIDER=bedrock.
+for security scanning. Uses the Messages API. Use by setting AI_SAST_LLM=bedrock.
 """
 
 import json

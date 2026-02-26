@@ -12,7 +12,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull qwen2.5-coder:14b
 
 # Configure AI-SAST
-export LLM_BACKEND="ollama"
+export AI_SAST_LLM="ollama"
 export OLLAMA_MODEL="qwen2.5-coder:14b"
 
 # Run a scan
@@ -110,7 +110,7 @@ pip install -r requirements.txt
 
 ```bash
 # Set backend to Ollama
-export LLM_BACKEND="ollama"
+export AI_SAST_LLM="ollama"
 
 # Optional: Change model (defaults to qwen2.5-coder:14b)
 export OLLAMA_MODEL="qwen2.5-coder:14b"
@@ -171,7 +171,7 @@ python -m src.core.scanner --directory ./your-code
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LLM_BACKEND` | Set to `ollama` to use Ollama | `vertex` |
+| `AI_SAST_LLM` | Set to `ollama` for local Ollama; `vertex` for Vertex AI | `vertex` |
 | `OLLAMA_BASE_URL` | Ollama API endpoint | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Model to use | `qwen2.5-coder:14b` |
 
@@ -182,14 +182,14 @@ Ollama requires a running service, so it's primarily for local development. For 
 ```yaml
 # .github/workflows/pr-scan.yml
 env:
-  LLM_BACKEND: "vertex"  # Use Vertex AI in CI/CD
+  AI_SAST_LLM: "vertex"  # Use Vertex AI in CI/CD
   GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
 ```
 
 For local development:
 ```bash
 # Local
-export LLM_BACKEND="ollama"
+export AI_SAST_LLM="ollama"
 ```
 
 ---
@@ -360,16 +360,16 @@ ollama pull qwen2.5-coder:14b
 ### Use Vertex AI (Cloud)
 
 ```bash
-unset LLM_BACKEND  # Uses default (vertex)
+unset AI_SAST_LLM  # Uses default (vertex)
 # or
-export LLM_BACKEND="vertex"
+export AI_SAST_LLM="vertex"
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
 ### Use Ollama (Local)
 
 ```bash
-export LLM_BACKEND="ollama"
+export AI_SAST_LLM="ollama"
 export OLLAMA_MODEL="qwen2.5-coder:14b"
 ```
 
@@ -377,10 +377,10 @@ export OLLAMA_MODEL="qwen2.5-coder:14b"
 
 ```bash
 # Use Vertex AI for this scan only
-LLM_BACKEND="vertex" python -m src.core.scanner --file test.py
+AI_SAST_LLM="vertex" python -m src.core.scanner --file test.py
 
 # Use Ollama for this scan only
-LLM_BACKEND="ollama" python -m src.core.scanner --file test.py
+AI_SAST_LLM="ollama" python -m src.core.scanner --file test.py
 ```
 
 ---

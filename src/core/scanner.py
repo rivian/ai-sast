@@ -20,17 +20,14 @@ import time
 import logging
 
 from .config import (
-    LLM_PROVIDER,
-    LLM_BACKEND,
     AI_SAST_LLM,
     PROJECT_ID, LOCATION, GEMINI_MODEL,
     OLLAMA_BASE_URL, OLLAMA_MODEL,
     AWS_REGION, BEDROCK_MODEL_ID,
 )
 
-# Import LLM clients based on provider/backend (AI_SAST_LLM takes precedence for initial scan)
-_SCAN_LLM = AI_SAST_LLM if AI_SAST_LLM else (LLM_BACKEND if LLM_BACKEND == "ollama" else LLM_PROVIDER)
-if _SCAN_LLM == "ollama":
+# Import LLM clients based on AI_SAST_LLM (vertex | bedrock | ollama)
+if AI_SAST_LLM == "ollama":
     from ..integrations.ollama import OllamaClient
     VertexAIClient = None
     BedrockClaudeClient = None
@@ -136,14 +133,14 @@ Format your response for each finding as:
             repo_url: Repository URL for reference
         """
         # Initialize LLM client based on AI_SAST_LLM (vertex | bedrock | ollama)
-        if _SCAN_LLM == "ollama":
+        if AI_SAST_LLM == "ollama":
             print(f"🔧 Initial scan LLM: Ollama (local), model: {OLLAMA_MODEL}")
             self.client = OllamaClient(
                 base_url=OLLAMA_BASE_URL,
                 model=OLLAMA_MODEL
             )
             self.backend = "ollama"
-        elif _SCAN_LLM == "bedrock":
+        elif AI_SAST_LLM == "bedrock":
             print(f"🔧 Initial scan LLM: AWS Bedrock (Claude), model: {BEDROCK_MODEL_ID}")
             self.client = BedrockClaudeClient(
                 region_name=AWS_REGION,

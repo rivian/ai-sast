@@ -48,15 +48,13 @@ All configuration is driven by environment variables. The table below lists supp
 | **Workflow & scan behavior** | | |
 | `AI_SAST_REPO` | GitHub repo to checkout (e.g. `org/ai-sast` or a fork). | `rivian/ai-sast` (in workflow) |
 | `AI_SAST_BASE_BRANCH` | Branch that triggers PR scan; PRs targeting this branch are scanned. | `main` |
-| `AI_SAST_SEVERITY` | Comma-separated severities to include in PR comments (e.g. `critical,high,medium`). | `critical,high` |
+| `AI_SAST_SEVERITY` | Comma-separated severities to include in PR comments (e.g. `critical,high,medium`). The validator runs only on findings in these severities. | `critical,high` |
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated path keywords to exclude from scanning (e.g. `test,vendor,mock`). | — |
 | `AI_SAST_CUSTOM_PROMPT` | Extra instructions appended to the scan prompt (e.g. focus on certain vuln types). | — |
 | `AI_SAST_STORE_FINDINGS` | When `true`, store scan findings (and validator results) in the database. | `false` |
 | `AI_SAST_DB_PATH` | Path to SQLite database for feedback and optional scan storage. | `~/.ai-sast/scans.db` |
 | **Initial scan LLM** | | |
 | `AI_SAST_LLM` | LLM for the initial security scan: `vertex`, `bedrock`, or `ollama`. | `vertex` |
-| `LLM_PROVIDER` | Legacy; same effect as `AI_SAST_LLM` when `AI_SAST_LLM` is not set. | `vertex` |
-| `LLM_BACKEND` | Legacy; use `ollama` for local Ollama. | `vertex` |
 | **Validator LLM** | | |
 | `AI_SAST_VALIDATOR_LLM` | LLM to validate findings (true/false positive): `vertex`, `bedrock`, or `ollama`. Only validated true positives are posted in the PR. If unset or error, all findings are posted. | `bedrock` |
 | `AI_SAST_VALIDATOR_BEDROCK_MODEL_ID` | Bedrock model used when validator is `bedrock`. | `anthropic.claude-3-5-sonnet-20241022-v2:0` |

@@ -5,23 +5,13 @@ Configuration file for AI-SAST LLM backends (Vertex AI, AWS Bedrock, Ollama)
 import os
 
 # ============================================================================
-# LLM Provider / Backend Selection
+# Initial scan LLM selection
 # ============================================================================
-
-# LLM_PROVIDER: Cloud LLM provider for scanning (legacy; prefer AI_SAST_LLM)
-# Options: "vertex" (Google Vertex AI, default) or "bedrock" (AWS Bedrock Claude)
-# Default: "vertex"
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "vertex").lower()
-
-# LLM_BACKEND: Legacy / additional backend; "ollama" for local open-source
-# Options: "vertex" (ignored if LLM_PROVIDER set) or "ollama" (local)
-# Default: "vertex"
-LLM_BACKEND = os.getenv("LLM_BACKEND", "vertex").lower()
 
 # AI_SAST_LLM: LLM provider for the initial security scan
 # Options: "vertex" (Gemini), "bedrock" (Claude), "ollama" (local)
 # Default: "vertex"
-AI_SAST_LLM = os.getenv("AI_SAST_LLM", os.getenv("LLM_PROVIDER", "vertex")).lower()
+AI_SAST_LLM = os.getenv("AI_SAST_LLM", "vertex").lower()
 
 # AI_SAST_VALIDATOR_LLM: LLM provider for validating findings (true positive check)
 # Options: "vertex", "bedrock", "ollama". If not configured or on error, validation is skipped.
@@ -67,7 +57,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:14b")
 
 # ============================================================================
-# AWS Bedrock Configuration (when LLM_PROVIDER=bedrock)
+# AWS Bedrock Configuration (when AI_SAST_LLM=bedrock)
 # ============================================================================
 
 # AWS_REGION: AWS region for Bedrock (e.g. us-east-1)
