@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Security vulnerability scanner using AI (Vertex AI or Ollama)
+Security vulnerability scanner using AI (Vertex AI, AWS Bedrock, or Ollama)
 
 This module provides functionality to scan source code for security vulnerabilities
-using either Google Cloud Vertex AI or local Ollama models.
+using Google Cloud Vertex AI, AWS Bedrock (Claude), or local Ollama models.
 """
 
 import sys
@@ -20,18 +20,25 @@ import time
 import logging
 
 from .config import (
-    LLM_BACKEND, 
+    AI_SAST_LLM,
     PROJECT_ID, LOCATION, GEMINI_MODEL,
-    OLLAMA_BASE_URL, OLLAMA_MODEL
+    OLLAMA_BASE_URL, OLLAMA_MODEL,
+    AWS_REGION, BEDROCK_MODEL_ID,
 )
 
-# Import LLM clients based on backend
-if LLM_BACKEND == "ollama":
+# Import LLM clients based on AI_SAST_LLM (vertex | bedrock | ollama)
+if AI_SAST_LLM == "ollama":
     from ..integrations.ollama import OllamaClient
     VertexAIClient = None
+    BedrockClaudeClient = None
+elif AI_SAST_LLM == "bedrock":
+    from ..integrations.bedrock import BedrockClaudeClient
+    from .vertex import VertexAIClient  # may be used for fallback
+    OllamaClient = None
 else:
     from .vertex import VertexAIClient
     OllamaClient = None
+    BedrockClaudeClient = None
 
 # Optional integrations - import only if available
 try:
@@ -125,21 +132,27 @@ Format your response for each finding as:
             location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
-        # Initialize LLM client based on backend
-        if LLM_BACKEND == "ollama":
-            print(f"🔧 LLM Backend: Ollama (local)")
+        # Initialize LLM client based on AI_SAST_LLM (vertex | bedrock | ollama)
+        if AI_SAST_LLM == "ollama":
+            print(f"🔧 Initial scan LLM: Ollama (local), model: {OLLAMA_MODEL}")
             self.client = OllamaClient(
                 base_url=OLLAMA_BASE_URL,
                 model=OLLAMA_MODEL
             )
             self.backend = "ollama"
+        elif AI_SAST_LLM == "bedrock":
+            print(f"🔧 Initial scan LLM: AWS Bedrock (Claude), model: {BEDROCK_MODEL_ID}")
+            self.client = BedrockClaudeClient(
+                region_name=AWS_REGION,
+                model_id=BEDROCK_MODEL_ID,
+            )
+            self.backend = "bedrock"
         else:
-            print(f"🔧 LLM Backend: Vertex AI (Google Cloud)")
+            print(f"🔧 Initial scan LLM: Vertex AI (Gemini), model: {GEMINI_MODEL}")
             self.client = VertexAIClient(
                 project_id or PROJECT_ID,
                 location or LOCATION
             )
-            print(f"🤖 Using Gemini model: {GEMINI_MODEL}")
             self.backend = "vertex"
         
         # CI_PROJECT_URL (GitLab) or GITHUB_REPOSITORY (GitHub): Repository identifier
@@ -269,16 +282,32 @@ Format your response for each finding as:
                 limit=50
             )
             
+            total = len(false_positives) + len(confirmed_vulnerabilities)
+            if total > 0:
+                backend_name = type(self.feedback_client).__name__
+                print(f"✅ Loaded {total} feedback record(s) from {backend_name}. Sending to Vertex AI:")
+                if false_positives:
+                    print(f"   False positives ({len(false_positives)}):")
+                    for i, fp in enumerate(false_positives[:20], 1):
+                        issue = (fp.get("issue") or "N/A")[:60]
+                        path = (fp.get("file_path") or "N/A")[:50]
+                        print(f"     {i}. [{path}] {issue}")
+                    if len(false_positives) > 20:
+                        print(f"     ... and {len(false_positives) - 20} more")
+                if confirmed_vulnerabilities:
+                    print(f"   Confirmed vulnerabilities ({len(confirmed_vulnerabilities)}):")
+                    for i, cv in enumerate(confirmed_vulnerabilities[:20], 1):
+                        issue = (cv.get("issue") or "N/A")[:60]
+                        path = (cv.get("file_path") or "N/A")[:50]
+                        print(f"     {i}. [{path}] {issue}")
+                    if len(confirmed_vulnerabilities) > 20:
+                        print(f"     ... and {len(confirmed_vulnerabilities) - 20} more")
+            
             # Format context
             context = self.feedback_client.format_feedback_for_context(
                 false_positives,
                 confirmed_vulnerabilities
             )
-            
-            if context:
-                total = len(false_positives) + len(confirmed_vulnerabilities)
-                backend_name = type(self.feedback_client).__name__
-                print(f"✅ Loaded {total} feedback record(s) from {backend_name}")
             
             return context
             
@@ -304,7 +333,8 @@ Format your response for each finding as:
         if self.jira_context:
             jira_context_formatted = f"\n\nConsider the following context from the vulnerability database:\n\n---\n{self.jira_context}\n---"
         
-        # Format Databricks feedback context if it exists
+        # Retrieve feedback from DB (SQLite/Databricks) and include in Vertex AI prompt for accuracy
+        # (List of records was already printed when loaded in _get_feedback_context.)
         feedback_context_formatted = ""
         if self.feedback_context:
             feedback_context_formatted = f"\n\n## Feedback from Past Scans\n\n{self.feedback_context}\n\nPlease use this feedback to improve accuracy. Avoid reporting issues similar to the false positives listed above, and pay special attention to patterns similar to confirmed vulnerabilities.\n\n---"
@@ -335,9 +365,10 @@ Format your response for each finding as:
             try:
                 # Call LLM based on backend
                 if self.backend == "ollama":
-                    analysis = self.client.generate(prompt, temperature=0.2)
+                    analysis = self.client.generate_with_ollama(prompt, temperature=0.2)
+                elif self.backend == "bedrock":
+                    analysis = self.client.generate_with_bedrock(prompt, model_name=BEDROCK_MODEL_ID)
                 else:
-                    # Vertex AI backend
                     analysis = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
                 
                 return {

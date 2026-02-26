@@ -8,7 +8,7 @@ import os
 import re
 import html
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import hashlib
 
 class HTMLReportGenerator:
@@ -155,8 +155,11 @@ class HTMLReportGenerator:
         
         return html_content
     
-    def generate_markdown_report(self, results: List[Dict[str, Any]], report_title: str, repo_url: str, ref_name: str, report_context_text: Optional[str] = None) -> str:
-        """Generates a markdown-formatted report suitable for GitHub/GitLab comments."""
+    def generate_markdown_report(self, results: List[Dict[str, Any]], report_title: str, repo_url: str, ref_name: str, report_context_text: Optional[str] = None, validated_vuln_ids: Optional[Set[str]] = None, validator_reasoning: Optional[Dict[str, str]] = None) -> str:
+        """Generates a markdown-formatted report suitable for GitHub/GitLab comments.
+        If validated_vuln_ids is provided, only findings whose vuln_id is in that set are included (e.g. validator true positives only).
+        If validator_reasoning is provided (vuln_id -> proof text), adds a "Validator proof" line after Risk in the details section.
+        """
         allowed_severities = self._get_allowed_severities()
         print(f"ℹ️  Generating markdown report for severities: {', '.join(allowed_severities)}")
 
@@ -168,15 +171,24 @@ class HTMLReportGenerator:
             if key in allowed_severities
         }
 
+        # If validator was used, keep only findings that were validated as true positive
+        if validated_vuln_ids is not None:
+            filtered_vulns = {
+                key: [v for v in vulns if self._generate_vuln_id(v.get('file_path', ''), v.get('issue', ''), v.get('location', '')) in validated_vuln_ids]
+                for key, vulns in filtered_vulns.items()
+            }
+            filtered_vulns = {k: v for k, v in filtered_vulns.items() if v}
+
         summary = {level: len(vulns) for level, vulns in filtered_vulns.items()}
         summary["Total"] = sum(summary.values())
 
         if summary['Total'] == 0:
             original_total = sum(len(v) for v in vulnerabilities_by_severity.values())
+            if original_total > 0 and validated_vuln_ids is not None:
+                return f"✅ **{html.escape(report_title)}**: No findings were validated as true positive by the validator. All reported issues were filtered out."
             if original_total > 0:
                 return f"✅ **{html.escape(report_title)}**: No vulnerabilities found matching the severity filter: `{os.environ.get('AI_SAST_SEVERITY', 'critical,high')}`."
-            else:
-                return f"✅ **{html.escape(report_title)}**: No new vulnerabilities were found."
+            return f"✅ **{html.escape(report_title)}**: No new vulnerabilities were found."
 
         md_parts = [f"### {html.escape(report_title)}"]
         md_parts.append(f"**{summary.get('Total', 0)}** potential issue(s) found.")
@@ -232,6 +244,9 @@ class HTMLReportGenerator:
                 
                 details = f"<details><summary>📋 Click to see details, risk, and remediation</summary>"
                 details += f"\n\n**Risk:**\n{risk}\n"
+                if validator_reasoning and vuln_id in validator_reasoning and validator_reasoning[vuln_id]:
+                    proof = html.escape(validator_reasoning[vuln_id].strip())
+                    details += f"\n**Validator proof:** {proof}\n"
                 details += f"\n**Remediation:**\n```\n{fix}\n```\n"
                 details += "</details>"
                 md_parts.append(details)

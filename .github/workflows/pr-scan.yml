@@ -15,45 +15,14 @@ name: AI-SAST PR Scan
 # - This workflow only runs when code files (listed in ai-sast-extensions.txt) are changed
 # - Skips runs for documentation-only changes, saving CI/CD resources
 # - Updates to ai-sast-extensions.txt automatically trigger a run
+#
+# Note: Pull request scanning is handled by ai-sast.yml (single workflow for PR + full scan + feedback).
+# This workflow is workflow_dispatch-only to avoid duplicate scans when a PR is created.
+#
+# Scanner code: This workflow uses a single checkout (no separate ai-sast repo). The scanner is
+# the code in this repo at the ref you run from (e.g. default branch main when run from Actions UI).
 
 on:
-  pull_request:
-    branches: [ main, dev ]
-    paths:
-      # Only run when code files are changed (based on ai-sast-extensions.txt)
-      - '**.py'
-      - '**.js'
-      - '**.ts'
-      - '**.jsx'
-      - '**.tsx'
-      - '**.java'
-      - '**.cpp'
-      - '**.c'
-      - '**.h'
-      - '**.hpp'
-      - '**.php'
-      - '**.rb'
-      - '**.go'
-      - '**.rs'
-      - '**.cs'
-      - '**.sql'
-      - '**.sh'
-      - '**.bash'
-      - '**.graphql'
-      - '**.gql'
-      - '**.swift'
-      - '**.kt'
-      - '**.kts'
-      - '**.scala'
-      - '**.lua'
-      - '**.pl'
-      - '**.r'
-      - '**.R'
-      # Also run if scanning config changes
-      - 'ai-sast-extensions.txt'
-      - '.github/workflows/pr-scan.yml'
-      - 'src/**'
-      - 'prompts/**'
   workflow_dispatch:
 
 permissions:
@@ -75,6 +44,7 @@ jobs:
       # AI_SAST_STORE_FINDINGS: ${{ vars.AI_SAST_STORE_FINDINGS || 'false' }}
     
     steps:
+      # Single checkout: scanner code = this repo at the branch you run from (e.g. main). No separate rivian/ai-sast checkout.
       - name: Checkout code
         uses: actions/checkout@v4
         with:

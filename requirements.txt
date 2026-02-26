@@ -1,5 +1,8 @@
 # Google Cloud and Vertex AI dependencies
 google-cloud-aiplatform>=1.25.0
+
+# AWS Bedrock (optional; required when LLM_PROVIDER=bedrock)
+boto3>=1.28.0
 google-cloud-core>=2.3.3
 google-auth>=2.17.3
 google-auth-oauthlib>=1.0.0

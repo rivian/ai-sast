@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.core.scanner import SecurityScanner
 from src.core.report import HTMLReportGenerator
+from src.core.validator import validate_findings
 
 try:
     from src.integrations.notifications import WebhookClient
@@ -347,13 +348,54 @@ def main():
     
     # Generate markdown report for PR comment (optional)
     vulnerabilities_by_severity = html_generator._process_results_by_severity(scan_results)
+    allowed_severities = html_generator._get_allowed_severities()
+    # Only validate findings that can appear in the PR comment (per AI_SAST_SEVERITY)
+    findings_to_validate = {
+        sev: vulns for sev, vulns in vulnerabilities_by_severity.items()
+        if sev in allowed_severities
+    }
     total_vulns = sum(len(v) for v in vulnerabilities_by_severity.values())
-    
-    should_post_comment = bool(
-        vulnerabilities_by_severity.get("Critical") or 
-        vulnerabilities_by_severity.get("High")
-    )
-    
+    vulns_to_validate_count = sum(len(v) for v in findings_to_validate.values())
+
+    # Optional: validate findings with validator LLM; only post validated (true positive) in PR comment
+    validated_vuln_ids = None
+    validator_reasoning = None  # vuln_id -> 1-2 line proof for PR "Validator proof" section
+    validator_llm_and_results = None  # (validator_llm_str, all_results_by_id) for DB
+    if vulns_to_validate_count > 0:
+        try:
+            if vulns_to_validate_count < total_vulns:
+                print(f"🔧 Validator: validating {vulns_to_validate_count} finding(s) in severities {allowed_severities} (AI_SAST_SEVERITY); skipping {total_vulns - vulns_to_validate_count} outside scope.")
+            validator_result = validate_findings(findings_to_validate, repo_url=repo_url)
+            if validator_result is None:
+                print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment.")
+            else:
+                validated_vuln_ids, reasoning_by_id, all_results_by_id, validator_llm_label = validator_result
+                validator_reasoning = reasoning_by_id
+                validator_llm_and_results = (validator_llm_label, all_results_by_id)
+                print(f"🔧 Validator: kept {len(validated_vuln_ids)} finding(s) as true positive for PR comment.")
+        except Exception as e:
+            print(f"⚠️ Validator failed: {e}. Posting all findings in PR comment.")
+            validated_vuln_ids = None
+
+    # Persist validator LLM and result to DB for each finding (when storage enabled)
+    if validator_llm_and_results and os.environ.get('AI_SAST_STORE_FINDINGS', 'false').lower() in ['true', '1', 'yes']:
+        try:
+            from src.integrations.scan_database import ScanDatabase
+            validator_llm_label, all_results_by_id = validator_llm_and_results
+            db = ScanDatabase()
+            for vid, result_text in all_results_by_id.items():
+                db.update_validator_result(scan_id=scan_id, repo_url=repo_url, vuln_id=vid, validator_llm=validator_llm_label, validator_result=result_text)
+            db.close()
+            print(f"✅ Updated {len(all_results_by_id)} finding(s) with validator results in database.")
+        except Exception as e:
+            print(f"⚠️ Could not update validator results in database: {e}")
+
+    # Decide whether to post comment: if validator ran, post if any validated; else post if any finding in AI_SAST_SEVERITY
+    if validated_vuln_ids is not None:
+        should_post_comment = len(validated_vuln_ids) > 0
+    else:
+        should_post_comment = vulns_to_validate_count > 0
+
     if should_post_comment:
         print("\n💬 Generating markdown report for PR comment...")
         markdown_report = html_generator.generate_markdown_report(
@@ -361,7 +403,9 @@ def main():
             report_title="🤖 AI-SAST Security Scan",
             repo_url=repo_url,
             ref_name=github_ref_name,
-            report_context_text="PR changes"
+            report_context_text="PR changes",
+            validated_vuln_ids=validated_vuln_ids,
+            validator_reasoning=validator_reasoning,
         )
         
         # Save markdown report for GitHub Actions to use
@@ -370,7 +414,10 @@ def main():
         print("✅ Markdown report saved to pr_comment.md")
         print("   Use this file to post a PR comment in your workflow")
     else:
-        print("\nℹ️  No critical or high severity issues found.")
+        if validated_vuln_ids is not None and vulns_to_validate_count > 0:
+            print("\nℹ️  No findings validated as true positive; skipping PR comment.")
+        else:
+            print(f"\nℹ️  No findings in configured severities ({', '.join(allowed_severities)}).")
     
     # Send webhook notification (optional)
     if WebhookClient:

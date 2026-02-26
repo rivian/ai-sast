@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.core.scanner import SecurityScanner
 
 # Configure AI-SAST to use Ollama
-os.environ['LLM_BACKEND'] = 'ollama'
+os.environ['AI_SAST_LLM'] = 'ollama'
 os.environ['OLLAMA_MODEL'] = 'qwen2.5-coder:14b'  # or any other model
 os.environ['OLLAMA_BASE_URL'] = 'http://localhost:11434'  # default Ollama URL
 

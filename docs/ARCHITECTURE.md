@@ -218,7 +218,7 @@ Developer reviews PR comment
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `LLM_BACKEND` | Choose `vertex` or `ollama` | `vertex` |
+| `AI_SAST_LLM` | Choose `vertex`, `bedrock`, or `ollama` | `vertex` |
 | `GOOGLE_CLOUD_PROJECT` | GCP project ID | (required for vertex) |
 | `GOOGLE_LOCATION` | GCP region | `us-central1` |
 | `GEMINI_MODEL` | Gemini model name | `gemini-2.0-flash-exp` |
@@ -265,13 +265,13 @@ Developer reviews PR comment
 ### Local Development
 ```bash
 # Vertex AI
-export LLM_BACKEND="vertex"
+export AI_SAST_LLM="vertex"
 export GOOGLE_CLOUD_PROJECT="my-project"
 gcloud auth application-default login
 python -m src.main.pr_scan
 
 # Ollama
-export LLM_BACKEND="ollama"
+export AI_SAST_LLM="ollama"
 ollama serve
 python -m src.main.pr_scan
 ```
