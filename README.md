@@ -21,7 +21,8 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 
 1. **Trigger**: Pull request or manual "Run workflow"
 2. **Scan**: Code is analyzed by Vertex AI (Gemini), AWS Bedrock (Claude), or Ollama
-3. **Results**: PR comments and HTML/text report artifacts
+3. **Validator** (if configured): A second LLM (e.g. Bedrock/Claude) validates findings as true or false positive; only validated true positives are posted in the PR.
+4. **Results**: PR comments and HTML/text report artifacts
 
 📖 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
