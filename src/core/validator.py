@@ -8,6 +8,14 @@ import hashlib
 import os
 from typing import Dict, List, Optional, Set, Tuple
 
+# Optional: feedback client for historical true/false positive context
+try:
+    from ..integrations.feedback import get_feedback_client
+    FEEDBACK_AVAILABLE = True
+except ImportError:
+    get_feedback_client = None
+    FEEDBACK_AVAILABLE = False
+
 from .config import (
     AI_SAST_VALIDATOR_LLM,
     AI_SAST_VALIDATOR_BEDROCK_MODEL_ID,
@@ -25,8 +33,8 @@ def _vuln_id(file_path: str, issue: str, location: str) -> str:
     return hashlib.sha1(unique.encode()).hexdigest()[:8]
 
 
-def _validator_prompt(vuln: Dict) -> str:
-    return (
+def _validator_prompt(vuln: Dict, feedback_context: str = "") -> str:
+    base = (
         "You are a security expert. A static analysis tool reported the following finding. "
         "Is this a TRUE POSITIVE security vulnerability that could be exploited in context? "
         "Consider: is the finding accurate, exploitable, and not a false positive (e.g. test code, already mitigated)?\n\n"
@@ -36,10 +44,20 @@ def _validator_prompt(vuln: Dict) -> str:
         f"- Location: {vuln.get('location', 'N/A')}\n"
         f"- Severity: {vuln.get('severity', 'N/A')}\n"
         f"- Risk: {vuln.get('risk', 'N/A')}\n\n"
+    )
+    if feedback_context:
+        base += (
+            "## Feedback from Past Scans (use to improve accuracy)\n\n"
+            f"{feedback_context}\n\n"
+            "Avoid classifying as true positive if similar to the false positives above. "
+            "Favor true positive if similar to confirmed vulnerabilities above.\n\n"
+        )
+    base += (
         "Reply with exactly one word: TRUE or FALSE. "
         "If TRUE, on the next line add a single short sentence (validator proof) explaining why this is a true positive. "
         "If FALSE, on the next line add a single short sentence explaining why this is a false positive (e.g. test code, mitigated, not exploitable)."
     )
+    return base
 
 
 def _parse_response(response: str) -> Tuple[bool, str]:
@@ -88,6 +106,27 @@ def validate_findings(
 
     if not all_vulns:
         return (set(), {}, {}, "")
+
+    # Fetch feedback from DB (same as initial scan LLM) to improve validator accuracy
+    feedback_context = ""
+    if repo_url and FEEDBACK_AVAILABLE and get_feedback_client:
+        try:
+            client = get_feedback_client()
+            if client and getattr(client, "is_configured", True):
+                false_positives = client.get_false_positives_for_project(
+                    repo_url, days_back=90, limit=50
+                )
+                confirmed_vulnerabilities = client.get_confirmed_vulnerabilities_for_project(
+                    repo_url, days_back=90, limit=50
+                )
+                total_fb = len(false_positives) + len(confirmed_vulnerabilities)
+                if total_fb > 0:
+                    feedback_context = client.format_feedback_for_context(
+                        false_positives, confirmed_vulnerabilities
+                    )
+                    print(f"✅ Loaded {total_fb} feedback record(s) for validator context.")
+        except Exception as e:
+            print(f"⚠️ Could not load feedback for validator: {e}")
 
     provider = (os.getenv("AI_SAST_VALIDATOR_LLM") or "bedrock").lower()
     validator_llm_label = ""
@@ -142,7 +181,7 @@ def validate_findings(
             vuln.get("location", ""),
         )
         try:
-            prompt = _validator_prompt(vuln)
+            prompt = _validator_prompt(vuln, feedback_context=feedback_context)
             response = generate(prompt)
             is_tp, reasoning = _parse_response(response)
             if is_tp:
