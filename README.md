@@ -40,6 +40,57 @@ The workflow checks out **`rivian/ai-sast`** at runtime. One file runs **PR scan
 
 📚 **Full guide:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
+## Example PR comment
+
+When the PR scan finds issues, it posts a comment like this:
+
+```markdown
+### 🤖 AI-SAST Security Scan
+**2** potential issue(s) found.
+
+> 💡 **Help us improve!** Use the checkboxes below to mark each finding as a true positive (✅) or false positive (❌).
+
+| Severity | Count |
+|---|---|
+| 🔥 High | 2 |
+
+---
+
+<!-- vuln-id: abc12345 -->
+- [ ] ✅ True Positive
+- [ ] ❌ False Positive
+
+**ID**: `abc12345`
+**Severity**: High
+**Issue**: SQL Injection vulnerability in user query
+**Location**: `src/api/users.py:42`
+**CVSS Vector**: `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N`
+
+<details><summary>📋 Click to see details, risk, and remediation</summary>
+
+**Risk:** Attacker could manipulate SQL queries...
+
+**Validator proof:** User input is concatenated into the query without sanitization; a malicious payload could execute arbitrary SQL.
+
+**Remediation:** Use parameterized queries...
+
+</details>
+```
+
+## Feedback loop
+
+Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is **stored in a database** (SQLite by default, or Databricks) and **included in the prompt sent to Vertex AI** on future scans so the model can improve accuracy (e.g. avoid repeating false positives and pay attention to patterns similar to confirmed vulnerabilities).
+
+**How it works:**
+1. **PR scan** posts a comment with checkboxes next to each finding.
+2. **Developer** checks one box per finding (True Positive or False Positive).
+3. **collect-feedback** workflow runs when the comment is edited and **stores feedback in the database**.
+4. **Future scans** load that feedback and **add it to the Vertex AI (Gemini) prompt** as context, so the AI gets more accurate over time.
+
+Feedback collection is included in the same workflow file (see Integrate in your repository). No extra configuration needed for SQLite.
+
+📖 **Full guide:** [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
+
 ## Environment variables
 
 All configuration is driven by environment variables. The table below lists supported variables, their description, and default value (if any). Set them as repository **Secrets** or **Variables** in GitHub (Settings → Secrets and variables → Actions), or in the workflow `env` block.
@@ -96,56 +147,6 @@ All configuration is driven by environment variables. The table below lists supp
 
 *Secrets (e.g. `GOOGLE_CREDENTIALS`, `JIRA_API_TOKEN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) have no default and must be set in the repo.*
 
-## Example PR comment
-
-When the PR scan finds issues, it posts a comment like this:
-
-```markdown
-### 🤖 AI-SAST Security Scan
-**2** potential issue(s) found.
-
-> 💡 **Help us improve!** Use the checkboxes below to mark each finding as a true positive (✅) or false positive (❌).
-
-| Severity | Count |
-|---|---|
-| 🔥 High | 2 |
-
----
-
-<!-- vuln-id: abc12345 -->
-- [ ] ✅ True Positive
-- [ ] ❌ False Positive
-
-**ID**: `abc12345`
-**Severity**: High
-**Issue**: SQL Injection vulnerability in user query
-**Location**: `src/api/users.py:42`
-**CVSS Vector**: `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N`
-
-<details><summary>📋 Click to see details, risk, and remediation</summary>
-
-**Risk:** Attacker could manipulate SQL queries...
-
-**Validator proof:** User input is concatenated into the query without sanitization; a malicious payload could execute arbitrary SQL.
-
-**Remediation:** Use parameterized queries...
-````
-
-```
-## Feedback loop
-
-Developers can mark findings as **true positive** (✅) or **false positive** (❌) directly in the PR comment. That feedback is **stored in a database** (SQLite by default, or Databricks) and **included in the prompt sent to Vertex AI** on future scans so the model can improve accuracy (e.g. avoid repeating false positives and pay attention to patterns similar to confirmed vulnerabilities).
-
-**How it works:**
-1. **PR scan** posts a comment with checkboxes next to each finding.
-2. **Developer** checks one box per finding (True Positive or False Positive).
-3. **collect-feedback** workflow runs when the comment is edited and **stores feedback in the database**.
-4. **Future scans** load that feedback and **add it to the Vertex AI (Gemini) prompt** as context, so the AI gets more accurate over time.
-
-Feedback collection is included in the same workflow file (see Integrate in your repository). No extra configuration needed for SQLite.
-
-📖 **Full guide:** [docs/FEEDBACK-LOOP.md](docs/FEEDBACK-LOOP.md)
-
 ## Troubleshooting
 
 - **Auth errors:** Service account needs "Vertex AI User" role; `GOOGLE_CREDENTIALS` must be the full JSON key.
@@ -155,8 +156,8 @@ Feedback collection is included in the same workflow file (see Integrate in your
 
 ## Support
 
-- 🐛 [Report bugs](../../issues)
-- 💬 [Discussions](../../discussions)
+- 🐛 [Report bugs](https://github.com/rivian/ai-sast/issues)
+- 💬 [Discussions](https://github.com/rivian/ai-sast/discussions)
 - 📖 [Documentation](docs/)
 
 ---
