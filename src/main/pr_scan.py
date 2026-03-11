@@ -439,19 +439,7 @@ def main():
     
     _store_scan_findings(scan_results, repo_url, pr_number, scan_id)
 
-    # Generate HTML report
-    html_report_file = f'ai_sast_pr_scan_report_{timestamp}.html'
-    print(f"\n📊 Generating HTML report: {html_report_file}")
-    
     html_generator = HTMLReportGenerator()
-    html_generator.generate_report(
-        results=scan_results,
-        repo_url=repo_url,
-        ref_name=github_ref_name,
-        output_file=html_report_file
-    )
-    
-    # Generate markdown report for PR comment (optional)
     vulnerabilities_by_severity = html_generator._process_results_by_severity(scan_results)
     allowed_severities = html_generator._get_allowed_severities()
     # Only validate findings that can appear in the PR comment (per AI_SAST_SEVERITY)
@@ -462,9 +450,9 @@ def main():
     total_vulns = sum(len(v) for v in vulnerabilities_by_severity.values())
     vulns_to_validate_count = sum(len(v) for v in findings_to_validate.values())
 
-    # Optional: validate findings with validator LLM; only post validated (true positive) in PR comment
+    # Validate findings with validator LLM; only validated (true positive) go to PR comment and HTML report
     validated_vuln_ids = None
-    validator_reasoning = None  # vuln_id -> 1-2 line proof for PR "Validator proof" section
+    validator_reasoning = None  # vuln_id -> 1-2 line proof for PR / HTML "Validator proof" section
     validator_llm_and_results = None  # (validator_llm_str, all_results_by_id) for DB
     if vulns_to_validate_count > 0:
         try:
@@ -472,14 +460,14 @@ def main():
                 print(f"🔧 Validator: validating {vulns_to_validate_count} finding(s) in severities {allowed_severities} (AI_SAST_SEVERITY); skipping {total_vulns - vulns_to_validate_count} outside scope.")
             validator_result = validate_findings(findings_to_validate, repo_url=repo_url)
             if validator_result is None:
-                print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment.")
+                print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment and HTML report.")
             else:
                 validated_vuln_ids, reasoning_by_id, all_results_by_id, validator_llm_label = validator_result
                 validator_reasoning = reasoning_by_id
                 validator_llm_and_results = (validator_llm_label, all_results_by_id)
-                print(f"🔧 Validator: kept {len(validated_vuln_ids)} finding(s) as true positive for PR comment.")
+                print(f"🔧 Validator: kept {len(validated_vuln_ids)} finding(s) as true positive for PR comment and HTML report.")
         except Exception as e:
-            print(f"⚠️ Validator failed: {e}. Posting all findings in PR comment.")
+            print(f"⚠️ Validator failed: {e}. Posting all findings in PR comment and HTML report.")
             validated_vuln_ids = None
 
     # Persist validator LLM and result to DB for each finding (when storage enabled)
@@ -495,6 +483,19 @@ def main():
         except Exception as e:
             print(f"⚠️ Could not update validator results in database: {e}")
 
+    # Generate HTML report (same filter as PR comment: validated only when validator ran)
+    html_report_file = f'ai_sast_pr_scan_report_{timestamp}.html'
+    print(f"\n📊 Generating HTML report: {html_report_file}")
+    html_generator.generate_report(
+        results=scan_results,
+        repo_url=repo_url,
+        ref_name=github_ref_name,
+        output_file=html_report_file,
+        validated_vuln_ids=validated_vuln_ids,
+        validator_reasoning=validator_reasoning,
+    )
+
+    # Generate markdown report for PR comment (optional)
     # Decide whether to post comment: if validator ran, post if any validated; else post if any finding in AI_SAST_SEVERITY
     if validated_vuln_ids is not None:
         should_post_comment = len(validated_vuln_ids) > 0
