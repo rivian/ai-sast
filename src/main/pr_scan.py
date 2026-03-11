@@ -13,7 +13,6 @@ import json
 import time
 import fnmatch
 import hashlib
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 
@@ -343,74 +342,47 @@ def main():
             print(f"Skipped {len(skipped_file_cap)} file(s) due to max files per PR limit: {skipped_file_cap[:5]}{'...' if len(skipped_file_cap) > 5 else ''}")
         print("------------------------------------\n")
 
-    # Batching: send multiple files per Vertex call for more context and fewer API calls
+    # Batching: always send multiple files per Vertex call (no option to turn off)
     batch_size = int(os.environ.get('AI_SAST_PR_SCAN_BATCH_SIZE', '10'))
     batch_size = max(1, min(batch_size, 50))
-    max_batch_bytes = int(os.environ.get('AI_SAST_PR_SCAN_BATCH_MAX_BYTES', '0'))  # 0 = no per-batch cap
+    max_batch_bytes = int(os.environ.get('AI_SAST_PR_SCAN_BATCH_MAX_BYTES', '0'))
     if max_batch_bytes <= 0:
         max_batch_bytes = 2 * 1024 * 1024  # 2 MB default cap per batch
 
-    if batch_size > 1:
-        # Build batches: each batch has up to batch_size files and up to max_batch_bytes total
-        batches: List[List[Tuple[str, str, str]]] = []
-        current_batch: List[Tuple[str, str, str]] = []
-        current_bytes = 0
-        for (code, path, lang) in tasks:
-            size = len(code.encode('utf-8'))
-            if current_batch and (len(current_batch) >= batch_size or (max_batch_bytes > 0 and current_bytes + size > max_batch_bytes)):
-                batches.append(current_batch)
-                current_batch = []
-                current_bytes = 0
-            current_batch.append((code, path, lang))
-            current_bytes += size
-        if current_batch:
+    batches: List[List[Tuple[str, str, str]]] = []
+    current_batch: List[Tuple[str, str, str]] = []
+    current_bytes = 0
+    for (code, path, lang) in tasks:
+        size = len(code.encode('utf-8'))
+        if current_batch and (len(current_batch) >= batch_size or (max_batch_bytes > 0 and current_bytes + size > max_batch_bytes)):
             batches.append(current_batch)
-        print(f"\nScanning {len(tasks)} changed file(s) in {len(batches)} batch/batches (batch_size={batch_size})...")
-        for i, batch in enumerate(batches):
-            paths = [p for (_, p, _) in batch]
-            print(f"🔍 Batch {i + 1}/{len(batches)}: {len(batch)} file(s)")
-            try:
-                batch_results = scanner.scan_code_content_batch(batch, batch_descriptor=f"batch {i + 1}/{len(batches)}")
-                scan_results.extend(batch_results)
-                for p in paths:
-                    print(f"   Scanned: {p}")
-            except Exception as e:
-                print(f"❌ Batch failed: {e}")
-                for (_, path, lang) in batch:
-                    scan_results.append({
-                        "file_path": path,
-                        "language": lang,
-                        "analysis": f"Failed to scan (batch error): {str(e)}",
-                        "status": "error"
-                    })
-            if i < len(batches) - 1 and len(batches) > 1:
-                time.sleep(1)
-    else:
-        # Per-file parallel scan (original behavior)
-        max_workers = int(os.environ.get('AI_SAST_PR_SCAN_MAX_WORKERS', '5'))
-        max_workers = max(1, min(max_workers, 20))
-        print(f"\nScanning {len(tasks)} changed file(s) with {max_workers} parallel worker(s)...")
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_path = {
-                executor.submit(scanner.scan_code_content, code, path, lang): path
-                for (code, path, lang) in tasks
-            }
-            for future in as_completed(future_to_path):
-                file_path = future_to_path[future]
-                try:
-                    result = future.result()
-                    scan_results.append(result)
-                    print(f"🔍 Scanned: {file_path}")
-                    if max_workers > 1:
-                        time.sleep(1)
-                except Exception as e:
-                    print(f"❌ Error scanning {file_path}: {e}")
-                    scan_results.append({
-                        "file_path": file_path,
-                        "language": "unknown",
-                        "analysis": f"Failed to scan: {str(e)}",
-                        "status": "error"
-                    })
+            current_batch = []
+            current_bytes = 0
+        current_batch.append((code, path, lang))
+        current_bytes += size
+    if current_batch:
+        batches.append(current_batch)
+
+    print(f"\nScanning {len(tasks)} changed file(s) in {len(batches)} batch/batches (batch_size={batch_size})...")
+    for i, batch in enumerate(batches):
+        paths = [p for (_, p, _) in batch]
+        print(f"🔍 Batch {i + 1}/{len(batches)}: {len(batch)} file(s)")
+        try:
+            batch_results = scanner.scan_code_content_batch(batch, batch_descriptor=f"batch {i + 1}/{len(batches)}")
+            scan_results.extend(batch_results)
+            for p in paths:
+                print(f"   Scanned: {p}")
+        except Exception as e:
+            print(f"❌ Batch failed: {e}")
+            for (_, path, lang) in batch:
+                scan_results.append({
+                    "file_path": path,
+                    "language": lang,
+                    "analysis": f"Failed to scan (batch error): {str(e)}",
+                    "status": "error"
+                })
+        if i < len(batches) - 1 and len(batches) > 1:
+            time.sleep(1)
 
     if excluded_files:
         print("\n--- Excluded Files in this PR ---")
