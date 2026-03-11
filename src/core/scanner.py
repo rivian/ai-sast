@@ -406,7 +406,124 @@ Format your response for each finding as:
             "analysis": "Failed to get analysis after multiple retries.", 
             "status": "error"
         }
-    
+
+    def _parse_batch_response(self, response: str, expected_paths: List[str]) -> List[Dict]:
+        """
+        Parse a batched LLM response into one result dict per file.
+        Expects sections starting with "## File: <path>" (path may be on same line or next).
+        """
+        results_by_path: Dict[str, str] = {}
+        # Split on "## File:" to get sections (case-insensitive, allow optional space)
+        marker = "## File:"
+        parts = re.split(r'\n\s*##\s*File\s*:\s*', response, flags=re.IGNORECASE)
+        for i, part in enumerate(parts):
+            part = part.strip()
+            if not part:
+                continue
+            # First line of part is the path (or path is after "File: " on same line - already stripped)
+            lines = part.split('\n', 1)
+            path = lines[0].strip().strip('"\'')
+            analysis = lines[1].strip() if len(lines) > 1 else ""
+            if path:
+                results_by_path[path] = analysis
+            elif i < len(expected_paths):
+                results_by_path[expected_paths[i]] = analysis
+        # Return in same order as expected_paths; use placeholder for any missing
+        out = []
+        for path in expected_paths:
+            analysis = results_by_path.get(path, "No analysis returned for this file (batch response may not match expected format).")
+            out.append({
+                "file_path": path,
+                "language": "",  # filled by caller if needed
+                "analysis": analysis,
+                "status": "success"
+            })
+        return out
+
+    def scan_code_content_batch(
+        self, batch: List[tuple], batch_descriptor: str = ""
+    ) -> List[Dict]:
+        """
+        Scan multiple code contents in one LLM call for better context and efficiency.
+        Each element of batch is (code_content, file_path, language).
+
+        Returns:
+            List of result dicts (file_path, language, analysis, status) in same order as batch.
+        """
+        if not batch:
+            return []
+        if len(batch) == 1:
+            code, path, lang = batch[0]
+            return [self.scan_code_content(code, path, lang)]
+
+        # Build multi-file prompt: same instructions, multiple file blocks
+        jira_context_formatted = ""
+        if self.jira_context:
+            jira_context_formatted = f"\n\nConsider the following context from the vulnerability database:\n\n---\n{self.jira_context}\n---"
+        feedback_context_formatted = ""
+        if self.feedback_context:
+            feedback_context_formatted = f"\n\n## Feedback from Past Scans\n\n{self.feedback_context}\n\nPlease use this feedback to improve accuracy.\n\n---"
+        combined_context = jira_context_formatted + feedback_context_formatted
+        custom_instructions_formatted = f"\n\n{self.custom_instructions}" if self.custom_instructions else ""
+        prompt_with_context = self.DEFAULT_PROMPT.replace(
+            "{custom_instructions}",
+            f"{combined_context}{custom_instructions_formatted}"
+        )
+        file_blocks = []
+        expected_paths = []
+        for code_content, file_path, language in batch:
+            expected_paths.append(file_path)
+            file_blocks.append(
+                f"## File: {file_path}\nLanguage: {language}\n\nCode:\n```{language}\n{code_content}\n```"
+            )
+        files_section = "\n\n---\n\n".join(file_blocks)
+        batch_response_instruction = """
+
+## Batch response format (required)
+
+You are analyzing multiple files in one go. You MUST output one section per file. For each file, start with exactly:
+## File: <file_path>
+Use the exact file path as written above for that file. Then provide your analysis for that file using the same finding format (Vulnerability Level, Issue, Location, CVSS Vector, Risk, Fix), or write "No vulnerabilities found." if the file has no issues. Do not skip any file.
+"""
+        single_file_block = "File: {file_path}\nLanguage: {language}\n\nCode:\n```{language}\n{code_content}\n```"
+        prompt = prompt_with_context.replace(single_file_block, files_section + batch_response_instruction)
+        if files_section not in prompt:
+            prompt = "Multiple files to analyze:\n\n" + files_section + "\n\n" + prompt_with_context + batch_response_instruction
+
+        max_retries = 5
+        backoff_factor = 3
+        batch_label = batch_descriptor or f"{len(batch)} files"
+        for attempt in range(max_retries):
+            try:
+                if self.backend == "ollama":
+                    analysis_text = self.client.generate_with_ollama(prompt, temperature=0.2)
+                elif self.backend == "bedrock":
+                    analysis_text = self.client.generate_with_bedrock(prompt, model_name=BEDROCK_MODEL_ID)
+                else:
+                    analysis_text = self.client.generate_with_gemini(prompt, model_name=GEMINI_MODEL)
+                parsed = self._parse_batch_response(analysis_text, expected_paths)
+                for i, r in enumerate(parsed):
+                    if i < len(batch):
+                        r["language"] = batch[i][2]
+                return parsed
+            except Exception as e:
+                error_message = str(e)
+                if "429" in error_message and "Resource exhausted" in error_message:
+                    if attempt < max_retries - 1:
+                        wait_time = backoff_factor ** (attempt + 1)
+                        print(f"⚠️ Rate limit hit for batch ({batch_label}). Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"❌ Model failed after {max_retries} retries for batch: {error_message}")
+                        sys.exit(1)
+                print(f"❌ Batch scan failed: {error_message}")
+                sys.exit(1)
+        return [
+            {"file_path": p, "language": batch[i][2], "analysis": "Failed to get analysis after retries.", "status": "error"}
+            for i, p in enumerate(expected_paths)
+        ]
+
     def scan_file(self, file_path: str) -> Dict:
         """
         Scan a single file for security vulnerabilities
