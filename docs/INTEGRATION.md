@@ -28,6 +28,7 @@ The workflow checks out **`rivian/ai-sast`** by default. That’s it—PR scan r
 - **Using a fork:** Set repository variable **`AI_SAST_REPO`** (e.g. `your-org/ai-sast`) to checkout your fork instead of `rivian/ai-sast`.
 - **Default branch for PR scan:** Add variable **`AI_SAST_BASE_BRANCH`** (e.g. `main`, `master`, `develop`). Default is `main` if unset.
 - **Scanner ref:** Add variable **`AI_SAST_REF`** (e.g. `main`, `v1.0`) to pin the ai-sast version. Default is `main`.
+- **Update same PR comment:** Set **`AI_SAST_UPDATE_SAME_PR_COMMENT`** = `true` to update the existing AI-SAST comment on each scan run instead of posting a new one (reduces noise when multiple commits trigger multiple scans). Default is `false`.
 - **Self-hosted runners:** In the workflow file, set `runs-on: self-hosted` (or your runner label).
 
 ## Running scans

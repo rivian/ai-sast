@@ -85,6 +85,8 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       # SQLite feedback DB in workspace; cached so future scans retrieve feedback and send it to the LLM.
       AI_SAST_DB_PATH: ${{ github.workspace }}/.ai-sast-db/scans.db
+      # When true, update the same PR comment on each scan run; when false, post a new comment each time (default).
+      AI_SAST_UPDATE_SAME_PR_COMMENT: ${{ vars.AI_SAST_UPDATE_SAME_PR_COMMENT || 'false' }}
 
     steps:
       - name: Checkout repository
@@ -142,6 +144,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
+            const updateSame = process.env.AI_SAST_UPDATE_SAME_PR_COMMENT === 'true';
+            const marker = '🤖 AI-SAST Security Scan';
             if (!fs.existsSync('pr_comment.md')) {
               console.log('No pr_comment.md found');
               return;
@@ -151,13 +155,33 @@ jobs:
               console.log('pr_comment.md is empty');
               return;
             }
+            if (updateSame) {
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number
+              });
+              const aiSastComment = comments
+                .filter(c => c.body && c.body.includes(marker) && (c.user.type === 'Bot' || (c.user.login && c.user.login.endsWith('[bot]'))))
+                .pop();
+              if (aiSastComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: aiSastComment.id,
+                  body: report
+                });
+                console.log('Updated existing PR comment');
+                return;
+              }
+            }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
               body: report
             });
-            console.log('PR comment posted');
+            console.log(updateSame ? 'No existing AI-SAST comment found; posted new comment' : 'PR comment posted');
 
       - name: Upload PR scan reports
         if: always() && github.event_name == 'pull_request'
