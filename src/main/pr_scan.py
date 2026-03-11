@@ -13,8 +13,9 @@ import json
 import time
 import fnmatch
 import hashlib
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -268,14 +269,32 @@ def main():
         return False
     # --- End of Exclusion Logic ---
 
+    # --- DoS protection: file count and size limits ---
+    # AI_SAST_PR_SCAN_MAX_FILES: max number of files to scan per PR (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_FILE_SIZE: max size in bytes of added lines per file (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_TOTAL_SIZE: max total bytes of added lines per PR (0 = no limit)
+    max_files = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILES', '100'))
+    max_file_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILE_SIZE', '500000'))   # 500 KB default
+    max_total_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_TOTAL_SIZE', '5242880'))  # 5 MB default
+    max_files = max(0, max_files)
+    max_file_size = max(0, max_file_size)
+    max_total_size = max(0, max_total_size)
+    # --- End DoS protection ---
+
     scan_results = []
     excluded_files = []
+    skipped_file_size: List[str] = []
+    skipped_total_cap: List[str] = []
+    skipped_file_cap: List[str] = []
     
     # Initialize scanner
     scanner = SecurityScanner(repo_url=repo_url)
     file_patterns = scanner._load_file_extensions()
 
-    print("\nScanning changed files...")
+    total_added_bytes = 0
+
+    # Collect (added_code, file_path, language) for each file that needs scanning
+    tasks: List[Tuple[str, str, str]] = []
     for change in changes:
         file_path = change.get('new_path')
 
@@ -295,17 +314,60 @@ def main():
         added_code = parse_added_lines_from_diff(diff)
 
         if added_code:
-            print(f"🔍 Scanning changes in: {file_path}")
+            # DoS: cap number of files
+            if max_files > 0 and len(tasks) >= max_files:
+                skipped_file_cap.append(file_path)
+                continue
+            size = len(added_code.encode('utf-8'))
+            if max_file_size > 0 and size > max_file_size:
+                skipped_file_size.append(file_path)
+                print(f"ℹ️  Skipping (added lines too large, {size} bytes): {file_path}")
+                continue
+            if max_total_size > 0 and (total_added_bytes + size) > max_total_size:
+                skipped_total_cap.append(file_path)
+                print(f"ℹ️  Skipping (PR total size limit would be exceeded): {file_path}")
+                continue
+            total_added_bytes += size
             language = scanner._detect_language(file_path)
-            
-            result = scanner.scan_code_content(added_code, file_path, language)
-            scan_results.append(result)
-            
-            # Add delay between API calls to avoid rate limits
-            import time
-            time.sleep(2)
+            tasks.append((added_code, file_path, language))
         else:
             print(f"ℹ️  No added lines to scan in: {file_path}")
+
+    if skipped_file_size or skipped_total_cap or skipped_file_cap:
+        print("\n--- DoS limits (files/size caps) ---")
+        if skipped_file_size:
+            print(f"Skipped {len(skipped_file_size)} file(s) over max file size: {skipped_file_size[:5]}{'...' if len(skipped_file_size) > 5 else ''}")
+        if skipped_total_cap:
+            print(f"Skipped {len(skipped_total_cap)} file(s) due to PR total size limit: {skipped_total_cap[:5]}{'...' if len(skipped_total_cap) > 5 else ''}")
+        if skipped_file_cap:
+            print(f"Skipped {len(skipped_file_cap)} file(s) due to max files per PR limit: {skipped_file_cap[:5]}{'...' if len(skipped_file_cap) > 5 else ''}")
+        print("------------------------------------\n")
+
+    # Parallel scan: same approach as scan_directory to avoid one-file-at-a-time latency
+    max_workers = int(os.environ.get('AI_SAST_PR_SCAN_MAX_WORKERS', '5'))
+    max_workers = max(1, min(max_workers, 20))  # clamp 1–20
+    print(f"\nScanning {len(tasks)} changed file(s) with {max_workers} parallel worker(s)...")
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_path = {
+            executor.submit(scanner.scan_code_content, code, path, lang): path
+            for (code, path, lang) in tasks
+        }
+        for future in as_completed(future_to_path):
+            file_path = future_to_path[future]
+            try:
+                result = future.result()
+                scan_results.append(result)
+                print(f"🔍 Scanned: {file_path}")
+                if max_workers > 1:
+                    time.sleep(1)  # throttle to reduce rate-limit risk
+            except Exception as e:
+                print(f"❌ Error scanning {file_path}: {e}")
+                scan_results.append({
+                    "file_path": file_path,
+                    "language": "unknown",
+                    "analysis": f"Failed to scan: {str(e)}",
+                    "status": "error"
+                })
 
     if excluded_files:
         print("\n--- Excluded Files in this PR ---")

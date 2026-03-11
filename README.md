@@ -103,6 +103,10 @@ All configuration is driven by environment variables. The table below lists supp
 | `AI_SAST_SEVERITY` | Comma-separated severities to include in PR comments (e.g. `critical,high,medium`). The validator runs only on findings in these severities. | `critical,high` |
 | `AI_SAST_UPDATE_SAME_PR_COMMENT` | When `true`, each PR scan run updates the same PR comment with the latest results instead of posting a new comment (reduces noise on multi-commit PRs). When `false` or unset, a new comment is posted every time (default). | `false` |
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated path keywords to exclude from scanning (e.g. `test,vendor,mock`). | — |
+| `AI_SAST_PR_SCAN_MAX_WORKERS` | Number of parallel workers for PR diff scanning (Vertex/Bedrock API calls). Higher values speed up large PRs but may hit rate limits. | `5` |
+| `AI_SAST_PR_SCAN_MAX_FILES` | Max number of files to scan per PR (DoS protection). Set to `0` for no limit. | `100` |
+| `AI_SAST_PR_SCAN_MAX_FILE_SIZE` | Max size in bytes of added lines per file (DoS protection). Files exceeding this are skipped. Set to `0` for no limit. | `500000` (500 KB) |
+| `AI_SAST_PR_SCAN_MAX_TOTAL_SIZE` | Max total bytes of added lines per PR (DoS protection). Once exceeded, remaining files are skipped. Set to `0` for no limit. | `5242880` (5 MB) |
 | `AI_SAST_CUSTOM_PROMPT` | Extra instructions appended to the scan prompt (e.g. focus on certain vuln types). | — |
 | `AI_SAST_STORE_FINDINGS` | When `true`, store scan findings (and validator results) in the database. | `false` |
 | `AI_SAST_DB_PATH` | Path to SQLite database for feedback and optional scan storage. | `~/.ai-sast/scans.db` |
