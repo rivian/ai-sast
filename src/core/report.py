@@ -113,7 +113,9 @@ class HTMLReportGenerator:
         return vulnerabilities_by_severity
 
     def generate_report(self, results: List[Dict[str, Any]], repo_url: str, 
-                       ref_name: str, output_file: Optional[str] = None) -> str:
+                       ref_name: str, output_file: Optional[str] = None,
+                       validated_vuln_ids: Optional[Set[str]] = None,
+                       validator_reasoning: Optional[Dict[str, str]] = None) -> str:
         """
         Generate an HTML report from security scan results.
         
@@ -122,19 +124,30 @@ class HTMLReportGenerator:
             repo_url: Repository URL that was scanned
             ref_name: The branch name or commit SHA for generating links
             output_file: Output file path (optional)
+            validated_vuln_ids: If set (e.g. from validator LLM), only include these findings in the report.
+            validator_reasoning: Optional vuln_id -> proof text to show per finding.
             
         Returns:
             HTML content as string
         """
         
-        print(f"ℹ️  Generating full HTML report with all severities.")
+        if validated_vuln_ids is not None:
+            print(f"ℹ️  Generating HTML report with validated findings only.")
+        else:
+            print(f"ℹ️  Generating full HTML report with all severities.")
         
         vulnerabilities_by_severity = self._process_results_by_severity(results)
+        if validated_vuln_ids is not None:
+            vulnerabilities_by_severity = {
+                key: [v for v in vulns if self._generate_vuln_id(v.get('file_path', ''), v.get('issue', ''), v.get('location', '')) in validated_vuln_ids]
+                for key, vulns in vulnerabilities_by_severity.items()
+            }
+            vulnerabilities_by_severity = {k: v for k, v in vulnerabilities_by_severity.items() if v}
         
         summary = {level: len(vulns) for level, vulns in vulnerabilities_by_severity.items()}
         summary["Total"] = sum(summary.values())
         
-        results_html = self._generate_severity_results_html(vulnerabilities_by_severity, repo_url, ref_name)
+        results_html = self._generate_severity_results_html(vulnerabilities_by_severity, repo_url, ref_name, validator_reasoning=validator_reasoning)
         
         html_content = self.template.format(
             repo_url=html.escape(repo_url),
@@ -257,8 +270,8 @@ class HTMLReportGenerator:
             
         return '\n'.join(md_parts)
     
-    def _generate_severity_results_html(self, vulnerabilities_by_severity: Dict[str, List[Dict]], repo_url: str, ref_name: str) -> str:
-        """Generate HTML for results grouped by severity."""
+    def _generate_severity_results_html(self, vulnerabilities_by_severity: Dict[str, List[Dict]], repo_url: str, ref_name: str, validator_reasoning: Optional[Dict[str, str]] = None) -> str:
+        """Generate HTML for results grouped by severity. Optionally show validator proof per finding."""
         html_parts = []
         
         severity_map = {
@@ -285,6 +298,11 @@ class HTMLReportGenerator:
                 file_display_text = f"{html.escape(file_path_raw)}:{line_num}" if line_num else html.escape(file_path_raw)
                 file_display = f'<a href="{link}" target="_blank">{file_display_text}</a>' if link else html.escape(file_path_raw)
                 location_display = html.escape(location_raw)
+                proof_html = ""
+                if validator_reasoning:
+                    vuln_id = self._generate_vuln_id(file_path_raw, vuln.get('issue', ''), location_raw)
+                    if vuln_id in validator_reasoning and validator_reasoning[vuln_id]:
+                        proof_html = f"<p><strong>Validator proof:</strong> {html.escape(validator_reasoning[vuln_id].strip())}</p>"
 
                 vuln_details_html += f"""
                     <div class="vuln-item">
@@ -292,6 +310,7 @@ class HTMLReportGenerator:
                         <p><strong>Issue:</strong> {html.escape(vuln['issue'])}</p>
                         <p><strong>Location:</strong> {location_display}</p>
                         <p><strong>Risk:</strong> {html.escape(vuln['risk'])}</p>
+                        {proof_html}
                         <p><strong>Fix:</strong> <pre>{html.escape(vuln['fix'])}</pre></p>
                     </div>
                 """

@@ -1,4 +1,6 @@
 # Google Cloud and Vertex AI dependencies
+# Use Google Gen AI SDK for Gemini (replaces deprecated vertexai.generative_models)
+google-genai>=1.0.0
 google-cloud-aiplatform>=1.25.0
 
 # AWS Bedrock (optional; required when LLM_PROVIDER=bedrock)

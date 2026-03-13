@@ -14,7 +14,7 @@ import time
 import fnmatch
 import hashlib
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -268,14 +268,32 @@ def main():
         return False
     # --- End of Exclusion Logic ---
 
+    # --- DoS protection: file count and size limits ---
+    # AI_SAST_PR_SCAN_MAX_FILES: max number of files to scan per PR (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_FILE_SIZE: max size in bytes of added lines per file (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_TOTAL_SIZE: max total bytes of added lines per PR (0 = no limit)
+    max_files = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILES', '100'))
+    max_file_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILE_SIZE', '500000'))   # 500 KB default
+    max_total_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_TOTAL_SIZE', '5242880'))  # 5 MB default
+    max_files = max(0, max_files)
+    max_file_size = max(0, max_file_size)
+    max_total_size = max(0, max_total_size)
+    # --- End DoS protection ---
+
     scan_results = []
     excluded_files = []
+    skipped_file_size: List[str] = []
+    skipped_total_cap: List[str] = []
+    skipped_file_cap: List[str] = []
     
     # Initialize scanner
     scanner = SecurityScanner(repo_url=repo_url)
     file_patterns = scanner._load_file_extensions()
 
-    print("\nScanning changed files...")
+    total_added_bytes = 0
+
+    # Collect (added_code, file_path, language) for each file that needs scanning
+    tasks: List[Tuple[str, str, str]] = []
     for change in changes:
         file_path = change.get('new_path')
 
@@ -295,17 +313,76 @@ def main():
         added_code = parse_added_lines_from_diff(diff)
 
         if added_code:
-            print(f"🔍 Scanning changes in: {file_path}")
+            # DoS: cap number of files
+            if max_files > 0 and len(tasks) >= max_files:
+                skipped_file_cap.append(file_path)
+                continue
+            size = len(added_code.encode('utf-8'))
+            if max_file_size > 0 and size > max_file_size:
+                skipped_file_size.append(file_path)
+                print(f"ℹ️  Skipping (added lines too large, {size} bytes): {file_path}")
+                continue
+            if max_total_size > 0 and (total_added_bytes + size) > max_total_size:
+                skipped_total_cap.append(file_path)
+                print(f"ℹ️  Skipping (PR total size limit would be exceeded): {file_path}")
+                continue
+            total_added_bytes += size
             language = scanner._detect_language(file_path)
-            
-            result = scanner.scan_code_content(added_code, file_path, language)
-            scan_results.append(result)
-            
-            # Add delay between API calls to avoid rate limits
-            import time
-            time.sleep(2)
+            tasks.append((added_code, file_path, language))
         else:
             print(f"ℹ️  No added lines to scan in: {file_path}")
+
+    if skipped_file_size or skipped_total_cap or skipped_file_cap:
+        print("\n--- DoS limits (files/size caps) ---")
+        if skipped_file_size:
+            print(f"Skipped {len(skipped_file_size)} file(s) over max file size: {skipped_file_size[:5]}{'...' if len(skipped_file_size) > 5 else ''}")
+        if skipped_total_cap:
+            print(f"Skipped {len(skipped_total_cap)} file(s) due to PR total size limit: {skipped_total_cap[:5]}{'...' if len(skipped_total_cap) > 5 else ''}")
+        if skipped_file_cap:
+            print(f"Skipped {len(skipped_file_cap)} file(s) due to max files per PR limit: {skipped_file_cap[:5]}{'...' if len(skipped_file_cap) > 5 else ''}")
+        print("------------------------------------\n")
+
+    # Batching: always send multiple files per Vertex call (no option to turn off)
+    batch_size = int(os.environ.get('AI_SAST_PR_SCAN_BATCH_SIZE', '10'))
+    batch_size = max(1, min(batch_size, 50))
+    max_batch_bytes = int(os.environ.get('AI_SAST_PR_SCAN_BATCH_MAX_BYTES', '0'))
+    if max_batch_bytes <= 0:
+        max_batch_bytes = 2 * 1024 * 1024  # 2 MB default cap per batch
+
+    batches: List[List[Tuple[str, str, str]]] = []
+    current_batch: List[Tuple[str, str, str]] = []
+    current_bytes = 0
+    for (code, path, lang) in tasks:
+        size = len(code.encode('utf-8'))
+        if current_batch and (len(current_batch) >= batch_size or (max_batch_bytes > 0 and current_bytes + size > max_batch_bytes)):
+            batches.append(current_batch)
+            current_batch = []
+            current_bytes = 0
+        current_batch.append((code, path, lang))
+        current_bytes += size
+    if current_batch:
+        batches.append(current_batch)
+
+    print(f"\nScanning {len(tasks)} changed file(s) in {len(batches)} batch/batches (batch_size={batch_size})...")
+    for i, batch in enumerate(batches):
+        paths = [p for (_, p, _) in batch]
+        print(f"🔍 Batch {i + 1}/{len(batches)}: {len(batch)} file(s)")
+        try:
+            batch_results = scanner.scan_code_content_batch(batch, batch_descriptor=f"batch {i + 1}/{len(batches)}")
+            scan_results.extend(batch_results)
+            for p in paths:
+                print(f"   Scanned: {p}")
+        except Exception as e:
+            print(f"❌ Batch failed: {e}")
+            for (_, path, lang) in batch:
+                scan_results.append({
+                    "file_path": path,
+                    "language": lang,
+                    "analysis": f"Failed to scan (batch error): {str(e)}",
+                    "status": "error"
+                })
+        if i < len(batches) - 1 and len(batches) > 1:
+            time.sleep(1)
 
     if excluded_files:
         print("\n--- Excluded Files in this PR ---")
@@ -334,19 +411,7 @@ def main():
     
     _store_scan_findings(scan_results, repo_url, pr_number, scan_id)
 
-    # Generate HTML report
-    html_report_file = f'ai_sast_pr_scan_report_{timestamp}.html'
-    print(f"\n📊 Generating HTML report: {html_report_file}")
-    
     html_generator = HTMLReportGenerator()
-    html_generator.generate_report(
-        results=scan_results,
-        repo_url=repo_url,
-        ref_name=github_ref_name,
-        output_file=html_report_file
-    )
-    
-    # Generate markdown report for PR comment (optional)
     vulnerabilities_by_severity = html_generator._process_results_by_severity(scan_results)
     allowed_severities = html_generator._get_allowed_severities()
     # Only validate findings that can appear in the PR comment (per AI_SAST_SEVERITY)
@@ -357,9 +422,9 @@ def main():
     total_vulns = sum(len(v) for v in vulnerabilities_by_severity.values())
     vulns_to_validate_count = sum(len(v) for v in findings_to_validate.values())
 
-    # Optional: validate findings with validator LLM; only post validated (true positive) in PR comment
+    # Validate findings with validator LLM; only validated (true positive) go to PR comment and HTML report
     validated_vuln_ids = None
-    validator_reasoning = None  # vuln_id -> 1-2 line proof for PR "Validator proof" section
+    validator_reasoning = None  # vuln_id -> 1-2 line proof for PR / HTML "Validator proof" section
     validator_llm_and_results = None  # (validator_llm_str, all_results_by_id) for DB
     if vulns_to_validate_count > 0:
         try:
@@ -367,14 +432,14 @@ def main():
                 print(f"🔧 Validator: validating {vulns_to_validate_count} finding(s) in severities {allowed_severities} (AI_SAST_SEVERITY); skipping {total_vulns - vulns_to_validate_count} outside scope.")
             validator_result = validate_findings(findings_to_validate, repo_url=repo_url)
             if validator_result is None:
-                print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment.")
+                print("🔧 Validator: disabled (not configured or error). Posting all findings in PR comment and HTML report.")
             else:
                 validated_vuln_ids, reasoning_by_id, all_results_by_id, validator_llm_label = validator_result
                 validator_reasoning = reasoning_by_id
                 validator_llm_and_results = (validator_llm_label, all_results_by_id)
-                print(f"🔧 Validator: kept {len(validated_vuln_ids)} finding(s) as true positive for PR comment.")
+                print(f"🔧 Validator: kept {len(validated_vuln_ids)} finding(s) as true positive for PR comment and HTML report.")
         except Exception as e:
-            print(f"⚠️ Validator failed: {e}. Posting all findings in PR comment.")
+            print(f"⚠️ Validator failed: {e}. Posting all findings in PR comment and HTML report.")
             validated_vuln_ids = None
 
     # Persist validator LLM and result to DB for each finding (when storage enabled)
@@ -390,6 +455,19 @@ def main():
         except Exception as e:
             print(f"⚠️ Could not update validator results in database: {e}")
 
+    # Generate HTML report (same filter as PR comment: validated only when validator ran)
+    html_report_file = f'ai_sast_pr_scan_report_{timestamp}.html'
+    print(f"\n📊 Generating HTML report: {html_report_file}")
+    html_generator.generate_report(
+        results=scan_results,
+        repo_url=repo_url,
+        ref_name=github_ref_name,
+        output_file=html_report_file,
+        validated_vuln_ids=validated_vuln_ids,
+        validator_reasoning=validator_reasoning,
+    )
+
+    # Generate markdown report for PR comment (optional)
     # Decide whether to post comment: if validator ran, post if any validated; else post if any finding in AI_SAST_SEVERITY
     if validated_vuln_ids is not None:
         should_post_comment = len(validated_vuln_ids) > 0

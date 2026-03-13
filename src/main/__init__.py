@@ -1,9 +1,7 @@
 """
-Main scanning modules for CI/CD integration
+Main scanning modules for CI/CD integration.
+Run with: python -m src.main.pr_scan or python -m src.main.full_scan
 """
-
-from .full_scan import main as full_scan
-from .pr_scan import main as pr_scan
 
 __all__ = ['full_scan', 'pr_scan']
 
