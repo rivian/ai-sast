@@ -2,17 +2,16 @@
 """
 Vertex AI API Client Script
 
-This script demonstrates how to interact with Google Cloud Vertex AI API
-for various tasks including text generation, chat, and embeddings.
+Uses the Google Gen AI SDK (google-genai) with vertexai=True for Gemini and embeddings.
+See: https://cloud.google.com/vertex-ai/generative-ai/docs/deprecations/genai-vertexai-sdk
 """
 
 import json
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from google.cloud import aiplatform
-import vertexai
-from vertexai.generative_models import GenerativeModel, ChatSession
-from vertexai.language_models import TextEmbeddingModel, TextGenerationModel
+from google.genai import Client
+from google.genai import types as genai_types
 
 
 class VertexAIClient:
@@ -22,7 +21,7 @@ class VertexAIClient:
     
     def __init__(self, project_id: str, location: str = "us-central1"):
         """
-        Initialize the Vertex AI client
+        Initialize the Vertex AI client (Google Gen AI SDK with Vertex AI backend).
         
         Args:
             project_id: Google Cloud Project ID
@@ -36,7 +35,11 @@ class VertexAIClient:
             self._setup_token_authentication(google_token)
             print(f"🔑 Using Google Cloud authentication token from GOOGLE_TOKEN")
         
-        vertexai.init(project=project_id, location=location)
+        self._genai_client = Client(
+            vertexai=True,
+            project=project_id,
+            location=location,
+        )
         aiplatform.init(project=project_id, location=location)
         
         print(f"✅ Vertex AI client initialized for project: {project_id}")
@@ -73,14 +76,14 @@ class VertexAIClient:
                 print(f"🔑 Using token as access token (limited functionality)")
                 pass
 
-    def generate_text(self, prompt: str, model_name: str = "text-bison@001", 
+    def generate_text(self, prompt: str, model_name: str = "gemini-2.5-flash",
                      max_output_tokens: int = 1024, temperature: float = 0.2) -> str:
         """
-        Generate text using Vertex AI Text Generation model
+        Generate text using Gemini via Google Gen AI SDK.
         
         Args:
             prompt: Input text prompt
-            model_name: Model to use for generation
+            model_name: Gemini model to use
             max_output_tokens: Maximum tokens in response
             temperature: Creativity level (0.0-1.0)
             
@@ -88,25 +91,22 @@ class VertexAIClient:
             Generated text response
         """
         try:
-            model = TextGenerationModel.from_pretrained(model_name)
-            
-            response = model.predict(
-                prompt=prompt,
-                max_output_tokens=max_output_tokens,
-                temperature=temperature,
-                top_k=40,
-                top_p=0.8,
+            response = self._genai_client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(
+                    max_output_tokens=max_output_tokens,
+                    temperature=temperature,
+                ),
             )
-            
-            return response.text
-            
+            return response.text or ""
         except Exception as e:
-            print(f"❌ Error with PaLM: {str(e)}")
+            print(f"❌ Error with Gemini: {str(e)}")
             raise
 
     def generate_with_gemini(self, prompt: str, model_name: str = "gemini-2.5-pro") -> str:
         """
-        Generate text using Gemini model
+        Generate text using Gemini via Google Gen AI SDK.
         
         Args:
             prompt: Input text prompt
@@ -116,78 +116,89 @@ class VertexAIClient:
             Generated text response
         """
         try:
-            model = GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            
-            # Handle multi-part responses by joining them.
+            response = self._genai_client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=genai_types.GenerateContentConfig(temperature=0.2),
+            )
+            if hasattr(response, "text") and response.text is not None:
+                return response.text
             if response.candidates and response.candidates[0].content.parts:
-                return "".join(part.text for part in response.candidates[0].content.parts)
-            
-            # Fallback for simple responses (though the above should cover it)
-            return response.text
-            
+                return "".join(
+                    getattr(p, "text", "") or ""
+                    for p in response.candidates[0].content.parts
+                )
+            return ""
         except Exception as e:
             print(f"❌ Error with Gemini: {str(e)}")
             raise
 
-    def start_chat_session(self, model_name: str = "gemini-2.5-pro") -> Optional[ChatSession]:
+    def start_chat_session(self, model_name: str = "gemini-2.5-pro") -> Optional[Any]:
         """
-        Start a chat session with Gemini
+        Start a chat session with Gemini (Google Gen AI SDK).
         
         Args:
             model_name: Gemini model to use
             
         Returns:
-            Chat session object
+            Chat session object (genai chat)
         """
         try:
-            model = GenerativeModel(model_name)
-            chat_session = model.start_chat()
-            
+            chat = self._genai_client.chats.create(model=model_name)
             print(f"✅ Chat session started with {model_name}")
-            return chat_session
-            
+            return chat
         except Exception as e:
             print(f"❌ Error starting chat session: {e}")
             return None
 
-    def send_chat_message(self, chat_session: ChatSession, message: str) -> str:
+    def send_chat_message(self, chat_session: Any, message: str) -> str:
         """
-        Send a message in a chat session
+        Send a message in a chat session.
         
         Args:
-            chat_session: Active chat session
+            chat_session: Active chat session (from start_chat_session)
             message: Message to send
             
         Returns:
-            Response from the model
+            Response text from the model
         """
         try:
             response = chat_session.send_message(message)
-            return response.text
-            
+            return getattr(response, "text", "") or ""
         except Exception as e:
             print(f"❌ Error sending chat message: {e}")
             return ""
 
-    def get_embeddings(self, texts: List[str], model_name: str = "textembedding-gecko@001") -> List[List[float]]:
+    def get_embeddings(self, texts: List[str], model_name: str = "text-embedding-004") -> List[List[float]]:
         """
-        Generate embeddings for given texts
+        Generate embeddings for given texts (Google Gen AI SDK).
         
         Args:
             texts: List of texts to embed
-            model_name: Embedding model to use
+            model_name: Embedding model (e.g. text-embedding-004, gemini-embedding-001)
             
         Returns:
             List of embedding vectors
         """
         try:
-            model = TextEmbeddingModel.from_pretrained(model_name)
-            
-            embeddings = model.get_embeddings(texts)  # type: ignore[arg-type]
-            
-            return [embedding.values for embedding in embeddings]
-            
+            result: List[List[float]] = []
+            for text in texts:
+                response = self._genai_client.models.embed_content(
+                    model=model_name,
+                    contents=text,
+                )
+                if response.embeddings:
+                    emb = response.embeddings[0]
+                    values = getattr(emb, "values", None) or getattr(emb, "embedding", None)
+                    if values is not None:
+                        result.append(list(values))
+                    elif hasattr(emb, "__iter__") and not isinstance(emb, (str, bytes)):
+                        result.append(list(emb))
+                    else:
+                        result.append([])
+                else:
+                    result.append([])
+            return result
         except Exception as e:
             print(f"❌ Error getting embeddings: {e}")
             return []
