@@ -28,15 +28,20 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 
 ## Integrate in your repository
 
-1. **Copy the workflow file** into your repo as `.github/workflows/ai-sast.yml`:  
+1. **Fork this repository** so the workflow uses your fork (and so the project’s fork count reflects adoption).
+
+2. **Copy the workflow file** into the repo you want to scan as `.github/workflows/ai-sast.yml`:  
    [`.github/workflows/ai-sast.yml`](.github/workflows/ai-sast.yml)
 
-2. **Add repository secrets** (Settings → Secrets and variables → Actions):  
+3. **Set the repository variable** (Settings → Secrets and variables → Actions → Variables):  
+   `AI_SAST_REPO` = your fork (e.g. `your-username/ai-sast`).
+
+4. **Add repository secrets** (Settings → Secrets and variables → Actions → Secrets):  
    `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CREDENTIALS`
 
-The workflow checks out **`rivian/ai-sast`** at runtime. One file runs **PR scan** (on pull requests when base branch is `main`), **full scan** (manual "Run workflow"), and **feedback collection** (when someone edits a PR comment and checks a true/false positive box).
+The workflow checks out **your fork** at runtime. One file runs **PR scan** (on pull requests when base branch is `main`), **full scan** (manual "Run workflow"), and **feedback collection** (when someone edits a PR comment and checks a true/false positive box).
 
-**Optional:** Set variable `AI_SAST_REPO` (e.g. for a fork); `AI_SAST_BASE_BRANCH` (default `main`); `runs-on: self-hosted` in the workflow for your own runners.
+**Optional:** Set `AI_SAST_BASE_BRANCH` (default `main`); `AI_SAST_REF` (default `main`); `runs-on: self-hosted` in the workflow for your own runners.
 
 📚 **Full guide:** [docs/INTEGRATION.md](docs/INTEGRATION.md)
 
@@ -98,7 +103,7 @@ All configuration is driven by environment variables. The table below lists supp
 | Variable | Description | Default |
 |----------|-------------|---------|
 | **Workflow & scan behavior** | | |
-| `AI_SAST_REPO` | GitHub repo to checkout (e.g. `org/ai-sast` or a fork). | `rivian/ai-sast` (in workflow) |
+| `AI_SAST_REPO` | Your fork of this repo (e.g. `your-username/ai-sast`). **Required**—fork first, then set this variable. | — |
 | `AI_SAST_BASE_BRANCH` | Branch that triggers PR scan; PRs targeting this branch are scanned. | `main` |
 | `AI_SAST_SEVERITY` | Comma-separated severities to include in PR comments (e.g. `critical,high,medium`). The validator runs only on findings in these severities. | `critical,high` |
 | `AI_SAST_UPDATE_SAME_PR_COMMENT` | When `true`, each PR scan run updates the same PR comment with the latest results instead of posting a new comment (reduces noise on multi-commit PRs). When `false` or unset, a new comment is posted every time (default). | `false` |
@@ -158,7 +163,7 @@ All configuration is driven by environment variables. The table below lists supp
 - **Auth errors:** Service account needs "Vertex AI User" role; `GOOGLE_CREDENTIALS` must be the full JSON key.
 - **No PR comment:** Ensure the PR targets the branch set by `AI_SAST_BASE_BRANCH` (default `main`).
 - **Feedback not triggering:** The feedback job runs from your **default branch** (e.g. `main`). Make sure `ai-sast.yml` is merged to that branch—if it only exists on a feature branch, checking boxes in the PR comment won’t trigger the workflow.
-- **Using a fork:** Set repository variable `AI_SAST_REPO` to your `org/ai-sast`.
+- **Setup:** Fork this repo, then set repository variable `AI_SAST_REPO` to your fork (e.g. `your-username/ai-sast`).
 
 ## Support
 
