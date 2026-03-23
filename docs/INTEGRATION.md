@@ -6,7 +6,7 @@ Run AI-SAST (PR scan + full scan) **in your repo on your runners**. The workflow
 
 ### 1. Fork this repository
 
-Fork [rivian/ai-sast](https://github.com/rivian/ai-sast) so the workflow uses your fork. This also helps the project’s visibility (fork count) and lets you customize the scanner.
+Fork [rivian/ai-sast](https://github.com/rivian/ai-sast) so the workflow uses your fork and lets you customize the scanner.
 
 ### 2. Copy the workflow file
 

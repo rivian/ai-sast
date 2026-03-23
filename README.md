@@ -28,7 +28,7 @@ AI-SAST is an AI-driven static application security testing tool. Run it in **yo
 
 ## Integrate in your repository
 
-1. **Fork this repository** so the workflow uses your fork (and so the project’s fork count reflects adoption).
+1. **Fork this repository** so the workflow uses your fork.
 
 2. **Copy the workflow file** into the repo you want to scan as `.github/workflows/ai-sast.yml`:  
    [`.github/workflows/ai-sast.yml`](.github/workflows/ai-sast.yml)
