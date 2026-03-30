@@ -63,10 +63,10 @@ When assessing the severity of a vulnerability, consider the **likelihood of exp
 ## Response Format:
 
 Format your response for each finding as:
-- **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
+- **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW]
 - **Issue**: Brief description of the vulnerability.
 - **Location**: File name which the vulnerability exists and any associated file names which are involved in the vulnerability. If not applicable, use "N/A".
-- **CVSS Vector**: The full CVSS v3.1 vector string (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"). Ensure the Privileges Required (PR) metric accurately reflects the access level needed for exploitation.
+- **CVSS Vector** (optional): Include a full CVSS v3.1 vector string only when you can justify it (e.g., "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"). Omit this entire line if unsure.
 - **Risk**: A brief explanation of the security impact, including specific mention of the attack prerequisites (e.g., "Requires attacker to have privileged access to trigger DAG with custom parameters").
 - **Fix**: Specific remediation steps, including a secure code example.
 
@@ -117,7 +117,7 @@ This prompt is designed to:
 1. **Minimize False Positives**: Requires high confidence and exploitability
 2. **Data Flow Focus**: Emphasizes tracing user input through the code
 3. **Multi-File Awareness**: Considers cross-file vulnerabilities
-4. **Structured Output**: Ensures consistent, parseable results with CVSS scoring
+4. **Structured Output**: Ensures consistent, parseable results with optional CVSS when justified
 5. **Actionable Findings**: Provides specific remediation guidance
 
 ## Modifying the Base Prompt
