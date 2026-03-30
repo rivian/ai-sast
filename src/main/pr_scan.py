@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-GitHub Pull Request Diff Security Scanner
+GitHub Pull Request Security Scanner
 
-This script is designed to run in GitHub Actions on pull request events.
-It fetches the diff of the pull request, scans only the added/modified lines
-for security vulnerabilities, and can post results as a PR comment.
+Runs in GitHub Actions on pull request events. Resolves changed paths vs the PR
+base, loads each changed file's full content at the PR head revision in parallel
+workers, then scans that content and can post results as a PR comment.
 """
 
 import os
@@ -13,6 +13,8 @@ import json
 import time
 import fnmatch
 import hashlib
+import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 
@@ -29,81 +31,108 @@ except ImportError:
     WebhookClient = None
 
 
-def parse_added_lines_from_diff(diff: str) -> str:
-    """Parses a unified diff string and extracts only the added lines."""
-    added_lines = []
-    for line in diff.split('\n'):
-        if line.startswith('+') and not line.startswith('+++'):
-            added_lines.append(line[1:])  # Append line content without the '+'
-    return '\n'.join(added_lines)
-
-
-def get_pr_changes_from_github() -> List[Dict]:
+def get_pr_changed_paths_and_head_sha() -> Tuple[List[str], Optional[str]]:
     """
-    Get PR changes from GitHub Actions environment.
-    Uses GitHub's REST API or git diff depending on availability.
+    List file paths changed in the PR (git diff --name-status base...head).
+    Uses the post-rename path for renames. Omits deleted files.
+
+    Returns:
+        (paths, head_sha) or ([], None) if the event or git command is unavailable.
     """
-    # Check if we're in GitHub Actions
-    github_token = os.environ.get('GITHUB_TOKEN')
-    github_repository = os.environ.get('GITHUB_REPOSITORY')
     github_event_path = os.environ.get('GITHUB_EVENT_PATH')
-    
-    changes = []
-    
-    if github_event_path and os.path.exists(github_event_path):
-        with open(github_event_path, 'r') as f:
-            event = json.load(f)
-        base_sha = event.get('pull_request', {}).get('base', {}).get('sha')
-        head_sha = event.get('pull_request', {}).get('head', {}).get('sha')
-        if base_sha and head_sha:
-            print(f"Comparing {base_sha[:7]}...{head_sha[:7]}")
-            
-            # Use git diff to get changes
-            import subprocess
-            try:
-                # Get list of changed files
-                result = subprocess.run(
-                    ['git', 'diff', '--name-status', f'{base_sha}...{head_sha}'],
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                for line in result.stdout.strip().split('\n'):
-                    if not line:
-                        continue
-                    
-                    parts = line.split('\t')
-                    if len(parts) < 2:
-                        continue
-                    
-                    status = parts[0]
-                    file_path = parts[1]
-                    
-                    # Skip deleted files
-                    if status == 'D':
-                        continue
-                    
-                    # Get the diff for this file
-                    diff_result = subprocess.run(
-                        ['git', 'diff', f'{base_sha}...{head_sha}', '--', file_path],
-                        capture_output=True,
-                        text=True,
-                        check=True
-                    )
-                    
-                    changes.append({
-                        'new_path': file_path,
-                        'deleted_file': False,
-                        'diff': diff_result.stdout
-                    })
-                    
-            except subprocess.CalledProcessError as e:
-                print(f"⚠️  Warning: Git diff failed: {e}")
-                print("Falling back to full repository scan...")
-                return []
-    
-    return changes
+    if not github_event_path or not os.path.exists(github_event_path):
+        return [], None
+
+    with open(github_event_path, 'r') as f:
+        event = json.load(f)
+
+    pr = event.get('pull_request') or {}
+    base_sha = (pr.get('base') or {}).get('sha')
+    head_sha = (pr.get('head') or {}).get('sha')
+
+    if not base_sha or not head_sha:
+        return [], None
+
+    print(f"Comparing {base_sha[:7]}...{head_sha[:7]}")
+
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--name-status', f'{base_sha}...{head_sha}'],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"⚠️  Warning: Git name-status failed: {e}")
+        return [], None
+
+    paths: List[str] = []
+    for line in result.stdout.strip().split('\n'):
+        if not line.strip():
+            continue
+        parts = line.split('\t')
+        if len(parts) < 2:
+            continue
+        status = parts[0]
+        if status == 'D':
+            continue
+        if status.startswith('R') and len(parts) >= 3:
+            file_path = parts[2]
+        else:
+            file_path = parts[1]
+        paths.append(file_path)
+
+    return paths, head_sha
+
+
+def _git_show_file_at_rev(rev: str, path: str, timeout_s: int = 120) -> Tuple[str, Optional[str]]:
+    """
+    Read file content at revision ``rev`` (git show rev:path).
+
+    Returns:
+        (path, text) for text files, (path, "") for empty files, or (path, None)
+        if the blob is missing, binary, or git fails.
+    """
+    try:
+        proc = subprocess.run(
+            ['git', 'show', f'{rev}:{path}'],
+            capture_output=True,
+            timeout=timeout_s,
+        )
+        if proc.returncode != 0:
+            return path, None
+        data = proc.stdout
+        if not data:
+            return path, ""
+        sample = data[: min(8192, len(data))]
+        if b'\x00' in sample:
+            return path, None
+        try:
+            text = data.decode('utf-8')
+        except UnicodeDecodeError:
+            text = data.decode('utf-8', errors='replace')
+        return path, text
+    except (subprocess.TimeoutExpired, OSError, Exception):
+        return path, None
+
+
+def fetch_pr_file_contents_parallel(
+    file_paths: List[str], head_sha: str, max_workers: int
+) -> Dict[str, str]:
+    """Load full file contents at ``head_sha`` for each path using a thread pool."""
+    if not file_paths:
+        return {}
+    max_workers = max(1, min(max_workers, 64))
+    out: Dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_git_show_file_at_rev, head_sha, p): p for p in file_paths
+        }
+        for fut in as_completed(futures):
+            path, content = fut.result()
+            if content is not None:
+                out[path] = content
+    return out
 
 
 def _generate_vuln_id(file_path: str, issue: str, location: str) -> str:
@@ -191,7 +220,7 @@ def _store_scan_findings(scan_results: List[Dict], repo_url: str, pr_number: Opt
 
 
 def main():
-    """Main function to run security scan on PR diffs."""
+    """Main function to run security scan on changed files in a pull request (full file at PR head)."""
     
     # GitHub environment variables (automatically set by GitHub Actions)
     # GITHUB_REPOSITORY: Repository name in format "owner/repo"
@@ -226,12 +255,12 @@ def main():
     print("=" * 60)
     print()
     
-    # Get PR changes
-    print("Fetching PR changes...")
-    changes = get_pr_changes_from_github()
-    
-    if not changes:
-        print("⚠️  No changes detected or unable to fetch PR diff.")
+    # Resolve changed paths and PR head (full files read at head_sha below)
+    print("Resolving PR changed files...")
+    changed_paths, head_sha = get_pr_changed_paths_and_head_sha()
+
+    if not changed_paths:
+        print("⚠️  No changes detected or unable to resolve PR file list.")
         print("This may happen if:")
         print("  - Not running in a pull request context")
         print("  - Git history is not available")
@@ -243,7 +272,7 @@ def main():
         full_scan_main()
         return
     
-    print(f"✅ Found {len(changes)} changed file(s)")
+    print(f"✅ Found {len(changed_paths)} changed file(s)")
     
     # --- Exclusion Logic ---
     # AI_SAST_EXCLUDE_PATHS: Comma-separated paths to exclude from PR scanning (optional)
@@ -270,14 +299,17 @@ def main():
 
     # --- DoS protection: file count and size limits ---
     # AI_SAST_PR_SCAN_MAX_FILES: max number of files to scan per PR (0 = no limit)
-    # AI_SAST_PR_SCAN_MAX_FILE_SIZE: max size in bytes of added lines per file (0 = no limit)
-    # AI_SAST_PR_SCAN_MAX_TOTAL_SIZE: max total bytes of added lines per PR (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_FILE_SIZE: max size in bytes of full file content per file (0 = no limit)
+    # AI_SAST_PR_SCAN_MAX_TOTAL_SIZE: max total bytes of file contents per PR (0 = no limit)
+    # AI_SAST_PR_FETCH_WORKERS: parallel git show workers for loading PR files (default 8)
     max_files = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILES', '100'))
     max_file_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_FILE_SIZE', '500000'))   # 500 KB default
     max_total_size = int(os.environ.get('AI_SAST_PR_SCAN_MAX_TOTAL_SIZE', '5242880'))  # 5 MB default
     max_files = max(0, max_files)
     max_file_size = max(0, max_file_size)
     max_total_size = max(0, max_total_size)
+    fetch_workers = int(os.environ.get('AI_SAST_PR_FETCH_WORKERS', '8'))
+    fetch_workers = max(1, min(fetch_workers, 64))
     # --- End DoS protection ---
 
     scan_results = []
@@ -285,52 +317,78 @@ def main():
     skipped_file_size: List[str] = []
     skipped_total_cap: List[str] = []
     skipped_file_cap: List[str] = []
-    
+    skipped_unreadable: List[str] = []
+
     # Initialize scanner
     scanner = SecurityScanner(repo_url=repo_url)
     file_patterns = scanner._load_file_extensions()
 
-    total_added_bytes = 0
+    total_content_bytes = 0
 
-    # Collect (added_code, file_path, language) for each file that needs scanning
-    tasks: List[Tuple[str, str, str]] = []
-    for change in changes:
-        file_path = change.get('new_path')
-
+    candidate_paths: List[str] = []
+    for file_path in changed_paths:
         if should_be_excluded(file_path):
             excluded_files.append(file_path)
             continue
-        
-        # Check if the file matches any of the patterns
+
         if not any(fnmatch.fnmatch(file_path, pattern) for pattern in file_patterns):
             print(f"ℹ️  Skipping file with unsupported extension: {file_path}")
             continue
 
-        if change.get('deleted_file'):
-            continue
+        candidate_paths.append(file_path)
 
-        diff = change.get('diff', '')
-        added_code = parse_added_lines_from_diff(diff)
+    tasks: List[Tuple[str, str, str]] = []
 
-        if added_code:
+    if not candidate_paths:
+        print("ℹ️  No scannable files after exclusions and extension filter.")
+    elif not head_sha:
+        print("⚠️  Missing PR head SHA; cannot load file contents.")
+    else:
+        print(
+            f"📥 Loading full file contents at {head_sha[:7]} "
+            f"({len(candidate_paths)} file(s), {fetch_workers} parallel worker(s))..."
+        )
+        contents_by_path = fetch_pr_file_contents_parallel(
+            candidate_paths, head_sha, fetch_workers
+        )
+
+        # Collect (full_file_content, file_path, language) for each file to scan
+        for file_path in candidate_paths:
+            file_body = contents_by_path.get(file_path)
+            if file_body is None:
+                skipped_unreadable.append(file_path)
+                print(
+                    f"ℹ️  Skipping (unreadable, binary, or missing at {head_sha[:7]}): {file_path}"
+                )
+                continue
+            if not file_body.strip():
+                print(f"ℹ️  Skipping empty file: {file_path}")
+                continue
+
             # DoS: cap number of files
             if max_files > 0 and len(tasks) >= max_files:
                 skipped_file_cap.append(file_path)
                 continue
-            size = len(added_code.encode('utf-8'))
+            size = len(file_body.encode('utf-8'))
             if max_file_size > 0 and size > max_file_size:
                 skipped_file_size.append(file_path)
-                print(f"ℹ️  Skipping (added lines too large, {size} bytes): {file_path}")
+                print(f"ℹ️  Skipping (file too large, {size} bytes): {file_path}")
                 continue
-            if max_total_size > 0 and (total_added_bytes + size) > max_total_size:
+            if max_total_size > 0 and (total_content_bytes + size) > max_total_size:
                 skipped_total_cap.append(file_path)
                 print(f"ℹ️  Skipping (PR total size limit would be exceeded): {file_path}")
                 continue
-            total_added_bytes += size
+            total_content_bytes += size
             language = scanner._detect_language(file_path)
-            tasks.append((added_code, file_path, language))
-        else:
-            print(f"ℹ️  No added lines to scan in: {file_path}")
+            tasks.append((file_body, file_path, language))
+
+    if skipped_unreadable:
+        print("\n--- Skipped (unreadable / binary / missing at head) ---")
+        print(
+            f"{len(skipped_unreadable)} file(s): "
+            f"{skipped_unreadable[:5]}{'...' if len(skipped_unreadable) > 5 else ''}"
+        )
+        print("--------------------------------------------------------\n")
 
     if skipped_file_size or skipped_total_cap or skipped_file_cap:
         print("\n--- DoS limits (files/size caps) ---")
