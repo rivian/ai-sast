@@ -34,7 +34,7 @@ class HTMLReportGenerator:
         """Extracts the first number from a location string like 'Line 25'."""
         if not location_str:
             return None
-        match = re.search(r'(?:line|lines)\\s*(\\d+)', location_str, re.IGNORECASE)
+        match = re.search(r'(?:line|lines)\s*(\d+)', location_str, re.IGNORECASE)
         if match:
             return int(match.group(1))
         return None
@@ -81,21 +81,27 @@ class HTMLReportGenerator:
             r"-\s*\*\*Vulnerability Level\*\*:\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*\n"
             r"-\s*\*\*Issue\*\*:\s*(.*?)\n"
             r"-\s*\*\*Location\*\*:\s*(.*?)\n"
+            r"(?:-\s*\*\*CVSS Vector\*\*:\s*(.*?)\n)?"
             r"-\s*\*\*Risk\*\*:\s*(.*?)\n"
-            r"-\s*\*\*Fix\*\*:\s*(.*?)\n",
+            r"-\s*\*\*Fix\*\*:\s*(.*?)(?:\n-|\n\n|$)",
             re.DOTALL | re.IGNORECASE
         )
 
         for match in pattern.finditer(analysis_text):
-            level, issue, location, risk, fix = match.groups()
+            level, issue, location, cvss_vector, risk, fix = match.groups()
             level = level.strip().capitalize()
-            
-            vulnerabilities[level].append({
+            cvss = (cvss_vector or "").strip() or None
+
+            vuln_entry = {
                 "issue": issue.strip(),
                 "location": location.strip(),
                 "risk": risk.strip(),
                 "fix": fix.strip(),
-            })
+            }
+            if cvss:
+                vuln_entry["cvss_vector"] = cvss
+
+            vulnerabilities[level].append(vuln_entry)
         return vulnerabilities
 
     def _process_results_by_severity(self, results: List[Dict[str, Any]]) -> Dict[str, List[Dict]]:
@@ -238,7 +244,7 @@ class HTMLReportGenerator:
                 issue = html.escape(issue_raw)
                 risk = html.escape(vuln.get('risk', 'N/A'))
                 fix = html.escape(vuln.get('fix', 'N/A'))
-                cvss_vector = vuln.get('cvss_vector', 'N/A')
+                cvss_vector = vuln.get('cvss_vector')
 
                 md_parts.append("\n---\n")
                 
@@ -253,7 +259,8 @@ class HTMLReportGenerator:
                 md_parts.append(f"**Severity**: {severity}")
                 md_parts.append(f"**Issue**: {issue}")
                 md_parts.append(f"**Location**: {file_display}")
-                md_parts.append(f"**CVSS Vector**: `{html.escape(cvss_vector)}`")
+                if cvss_vector:
+                    md_parts.append(f"**CVSS Vector**: `{html.escape(str(cvss_vector).strip())}`")
                 
                 details = f"<details><summary>📋 Click to see details, risk, and remediation</summary>"
                 details += f"\n\n**Risk:**\n{risk}\n"
@@ -304,11 +311,16 @@ class HTMLReportGenerator:
                     if vuln_id in validator_reasoning and validator_reasoning[vuln_id]:
                         proof_html = f"<p><strong>Validator proof:</strong> {html.escape(validator_reasoning[vuln_id].strip())}</p>"
 
+                cvss_line = ""
+                if vuln.get("cvss_vector"):
+                    cvss_line = f"<p><strong>CVSS Vector:</strong> {html.escape(str(vuln['cvss_vector']).strip())}</p>"
+
                 vuln_details_html += f"""
                     <div class="vuln-item">
                         <p><strong>File:</strong> {file_display}</p>
                         <p><strong>Issue:</strong> {html.escape(vuln['issue'])}</p>
                         <p><strong>Location:</strong> {location_display}</p>
+                        {cvss_line}
                         <p><strong>Risk:</strong> {html.escape(vuln['risk'])}</p>
                         {proof_html}
                         <p><strong>Fix:</strong> <pre>{html.escape(vuln['fix'])}</pre></p>

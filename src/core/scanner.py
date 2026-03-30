@@ -114,10 +114,10 @@ Code:
 ```
 
 Format your response for each finding as:
-- **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW/INFO]
+- **Vulnerability Level**: [CRITICAL/HIGH/MEDIUM/LOW]
 - **Issue**: Brief description of the vulnerability.
 - **Location**: File name which the vulnerability exists.
-- **CVSS Vector**: The full CVSS v3.1 vector string.
+- **CVSS Vector** (optional): Full CVSS v3.1 vector string, or omit this line if unsure.
 - **Risk**: A brief explanation of the security impact.
 - **Fix**: Specific remediation steps.
 
@@ -483,7 +483,7 @@ Format your response for each finding as:
 
 You are analyzing multiple files in one go. You MUST output one section per file. For each file, start with exactly:
 ## File: <file_path>
-Use the exact file path as written above for that file. Then provide your analysis for that file using the same finding format (Vulnerability Level, Issue, Location, CVSS Vector, Risk, Fix), or write "No vulnerabilities found." if the file has no issues. Do not skip any file.
+Use the exact file path as written above for that file. Then provide your analysis for that file using the same finding format (Vulnerability Level, Issue, Location, optional CVSS Vector, Risk, Fix), or write "No vulnerabilities found." if the file has no issues. Do not skip any file.
 """
         single_file_block = "File: {file_path}\nLanguage: {language}\n\nCode:\n```{language}\n{code_content}\n```"
         prompt = prompt_with_context.replace(single_file_block, files_section + batch_response_instruction)
