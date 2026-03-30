@@ -109,10 +109,11 @@ All configuration is driven by environment variables. The table below lists supp
 | `AI_SAST_UPDATE_SAME_PR_COMMENT` | When `true`, each PR scan run updates the same PR comment with the latest results instead of posting a new comment (reduces noise on multi-commit PRs). When `false` or unset, a new comment is posted every time (default). | `false` |
 | `AI_SAST_EXCLUDE_PATHS` | Comma-separated path keywords to exclude from scanning (e.g. `test,vendor,mock`). | — |
 | `AI_SAST_PR_SCAN_BATCH_SIZE` | Number of files to send in one Vertex/Bedrock call. PR scan always uses batching (no option to turn off). | `10` |
-| `AI_SAST_PR_SCAN_BATCH_MAX_BYTES` | Max total bytes of added code per batch (avoids oversized requests). | `2097152` (2 MB) |
+| `AI_SAST_PR_SCAN_BATCH_MAX_BYTES` | Max total bytes of source per batch (avoids oversized requests). | `2097152` (2 MB) |
 | `AI_SAST_PR_SCAN_MAX_FILES` | Max number of files to scan per PR (DoS protection). Set to `0` for no limit. | `100` |
-| `AI_SAST_PR_SCAN_MAX_FILE_SIZE` | Max size in bytes of added lines per file (DoS protection). Files exceeding this are skipped. Set to `0` for no limit. | `500000` (500 KB) |
-| `AI_SAST_PR_SCAN_MAX_TOTAL_SIZE` | Max total bytes of added lines per PR (DoS protection). Once exceeded, remaining files are skipped. Set to `0` for no limit. | `5242880` (5 MB) |
+| `AI_SAST_PR_SCAN_MAX_FILE_SIZE` | Max size in bytes of each changed file’s full content at the PR head (DoS protection). Files exceeding this are skipped. Set to `0` for no limit. | `500000` (500 KB) |
+| `AI_SAST_PR_SCAN_MAX_TOTAL_SIZE` | Max total bytes of full file contents scanned per PR (DoS protection). Once exceeded, remaining files are skipped. Set to `0` for no limit. | `5242880` (5 MB) |
+| `AI_SAST_PR_FETCH_WORKERS` | Parallel `git show` workers when loading full PR files (higher can speed up large PRs). | `8` |
 | `AI_SAST_CUSTOM_PROMPT` | Extra instructions appended to the scan prompt (e.g. focus on certain vuln types). | — |
 | `AI_SAST_STORE_FINDINGS` | When `true`, store scan findings (and validator results) in the database. | `false` |
 | `AI_SAST_DB_PATH` | Path to SQLite database for feedback and optional scan storage. | `~/.ai-sast/scans.db` |
