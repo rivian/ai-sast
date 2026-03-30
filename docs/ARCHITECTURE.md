@@ -174,11 +174,13 @@ Developer creates PR
     │
     ├─> GitHub Actions triggered
     │
-    ├─> Fetch changed files (git diff)
+    ├─> List changed paths (git diff --name-status base...head)
     │
     ├─> Filter by extensions & exclusions
     │
-    ├─> For each file:
+    ├─> Parallel git show: full file content at PR head
+    │
+    ├─> For each file (batched to LLM):
     │   ├─> Load prompt from prompts/default_prompt.txt
     │   ├─> Add custom prompt if AI_SAST_CUSTOM_PROMPT set
     │   ├─> Send to LLM (Vertex AI or Ollama)
