@@ -8,6 +8,7 @@ for security vulnerabilities, and can post results as a PR comment.
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -260,10 +261,28 @@ def main():
     print(f"ℹ️  Full list of exclusion keywords: {', '.join(all_exclude_keywords)}")
 
     def should_be_excluded(file_path: str) -> bool:
-        """Check if a file path should be excluded based on keywords."""
-        path_lower = file_path.lower()
+        """Match keywords against whole path segments or name tokens, not substrings.
+
+        "test" matches tests/, test_x.py, x.test.js, __tests__/ but not latest.py;
+        "log" matches app.log, logs/ but not login.py. Keywords containing "/" match
+        as a path prefix or segment sequence; keywords containing "*" are fnmatch globs.
+        """
+        path_lower = file_path.lower().strip('/')
+        segments = [seg for seg in path_lower.split('/') if seg]
+        tokens = set(segments)
+        for seg in segments:
+            tokens.update(t for t in re.split(r'[._\-]+', seg) if t)
         for keyword in all_exclude_keywords:
-            if keyword.lower() in path_lower:
+            kw = keyword.lower().strip().strip('/')
+            if not kw:
+                continue
+            if '*' in kw or '?' in kw:
+                if fnmatch.fnmatch(path_lower, kw) or any(fnmatch.fnmatch(seg, kw) for seg in segments):
+                    return True
+            elif '/' in kw:
+                if path_lower == kw or path_lower.startswith(kw + '/') or f'/{kw}/' in f'/{path_lower}/':
+                    return True
+            elif kw in tokens or kw + 's' in tokens:
                 return True
         return False
     # --- End of Exclusion Logic ---
@@ -486,6 +505,20 @@ def main():
             validator_reasoning=validator_reasoning,
         )
         
+        coverage_notes = []
+        if excluded_files:
+            excluded_sorted = sorted(set(excluded_files))
+            coverage_notes.append(f"**Excluded from scan ({len(excluded_sorted)} file(s), path keywords):** " + ", ".join(f"`{f}`" for f in excluded_sorted[:20]) + (" ..." if len(excluded_sorted) > 20 else ""))
+        skipped_all = skipped_file_size + skipped_total_cap + skipped_file_cap
+        if skipped_all:
+            coverage_notes.append(f"**Skipped due to size/count limits ({len(skipped_all)} file(s)):** " + ", ".join(f"`{f}`" for f in skipped_all[:20]) + (" ..." if len(skipped_all) > 20 else ""))
+        if validated_vuln_ids is not None:
+            rejected_count = vulns_to_validate_count - len(validated_vuln_ids)
+            if rejected_count > 0:
+                coverage_notes.append(f"**Rejected by validator as false positive:** {rejected_count} finding(s)")
+        if coverage_notes:
+            markdown_report += "\n\n### Scan coverage\n\n" + "\n\n".join(coverage_notes) + "\n"
+
         # Save markdown report for GitHub Actions to use
         with open('pr_comment.md', 'w') as f:
             f.write(markdown_report)
