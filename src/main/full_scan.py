@@ -156,6 +156,11 @@ def main():
         text_report_file = f'{args.output_prefix}_report_{timestamp}.txt'
         print(f"\n📄 Generating text report: {text_report_file}")
         text_report = scanner.generate_report(results, text_report_file)
+        excluded_files = getattr(scanner, 'excluded_files', [])
+        if excluded_files:
+            with open(text_report_file, 'a') as f:
+                f.write(f"\n\nExcluded from scan ({len(excluded_files)} file(s), path keywords):\n")
+                f.write("\n".join(f"- {p}" for p in excluded_files) + "\n")
         
         # Generate HTML report
         html_report_file = f'{args.output_prefix}_report_{timestamp}.html'
@@ -184,6 +189,7 @@ def main():
         print('=' * 60)
         print(f'Scanned Directory: {os.path.abspath(scan_dir)}')
         print(f'Total files scanned: {len(results)}')
+        print(f'Files excluded by path keywords: {len(getattr(scanner, "excluded_files", []))}')
         print(f'Files with vulnerabilities: {len(vulnerable_files)}')
         print(f'Total vulnerabilities found: {total_vulns}')
         print(f'  - Critical: {len(vulnerabilities_by_severity.get("Critical", []))}')

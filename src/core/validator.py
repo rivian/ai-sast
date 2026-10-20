@@ -6,6 +6,7 @@ as true or false positive. Used optionally before posting PR comments.
 
 import hashlib
 import os
+import re
 from typing import Dict, List, Optional, Set, Tuple
 
 # Optional: feedback client for historical true/false positive context
@@ -60,21 +61,19 @@ def _validator_prompt(vuln: Dict, feedback_context: str = "") -> str:
     return base
 
 
-def _parse_response(response: str) -> Tuple[bool, str]:
-    """Returns (is_true_positive, reasoning). Reasoning is 1-2 lines after TRUE or FALSE."""
-    if not response:
-        return False, ""
+_VERDICT_RE = re.compile(r"^[\s*_`#>\"']*(?:answer|verdict)?\s*[:\-]?[\s*_`\"']*(TRUE|FALSE)\b[\s*_`\"'.:]*", re.IGNORECASE)
+
+
+def _parse_response(response: str) -> Tuple[Optional[bool], str]:
+    """Returns (is_true_positive, reasoning). is_true_positive is None when the reply has no clear TRUE/FALSE verdict."""
+    if not response or not response.strip():
+        return None, ""
     text = response.strip()
-    r = text.upper()
-    is_tp = r.startswith("TRUE") and not r.startswith("FALSE")
-    # Take the rest of the response after TRUE/FALSE (and optional newline) as reasoning, max 1-2 lines
-    rest = response.strip()
-    if rest.upper().startswith("TRUE"):
-        rest = rest[4:].lstrip("\n\r\t ").strip()
-    elif rest.upper().startswith("FALSE"):
-        rest = rest[5:].lstrip("\n\r\t ").strip()
-    else:
-        rest = ""
+    m = _VERDICT_RE.match(text)
+    if not m:
+        return None, ""
+    is_tp = m.group(1).upper() == "TRUE"
+    rest = text[m.end():].strip()
     reasoning = ""
     if rest:
         lines = [ln.strip() for ln in rest.split("\n") if ln.strip()][:2]
@@ -184,7 +183,13 @@ def validate_findings(
             prompt = _validator_prompt(vuln, feedback_context=feedback_context)
             response = generate(prompt)
             is_tp, reasoning = _parse_response(response)
-            if is_tp:
+            if is_tp is None:
+                # Fail closed: keep findings the validator could not clearly classify.
+                true_positive_ids.add(vid)
+                reasoning_by_id[vid] = "Unvalidated: validator reply had no clear TRUE/FALSE verdict."
+                all_results_by_id[vid] = f"unparsed: {(response or '').strip()[:200]}"
+                print(f"  [Validator] {vid}: UNPARSED (kept as unvalidated) — {(response or '').strip()[:100]!r}")
+            elif is_tp:
                 true_positive_ids.add(vid)
                 reasoning_by_id[vid] = reasoning or "Validated as true positive."
                 all_results_by_id[vid] = reasoning_by_id[vid]
@@ -194,6 +199,8 @@ def validate_findings(
                 all_results_by_id[vid] = f"false_positive: {fp_reasoning}"
                 print(f"  [Validator] {vid}: FALSE POSITIVE (rejected) — {fp_reasoning}")
         except Exception as e:
+            true_positive_ids.add(vid)
+            reasoning_by_id[vid] = "Unvalidated: validator error."
             all_results_by_id[vid] = f"error:{str(e)[:200]}"
-            print(f"  [Validator] {vid}: ERROR — {e}")
+            print(f"  [Validator] {vid}: ERROR (kept as unvalidated) — {e}")
     return (true_positive_ids, reasoning_by_id, all_results_by_id, validator_llm_label)

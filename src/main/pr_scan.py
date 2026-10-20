@@ -8,6 +8,7 @@ for security vulnerabilities, and can post results as a PR comment.
 """
 
 import os
+import re
 import sys
 import json
 import time
@@ -19,7 +20,7 @@ from typing import Optional, List, Dict, Tuple
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.core.scanner import SecurityScanner
+from src.core.scanner import SecurityScanner, is_path_excluded
 from src.core.report import HTMLReportGenerator
 from src.core.validator import validate_findings
 
@@ -260,12 +261,7 @@ def main():
     print(f"ℹ️  Full list of exclusion keywords: {', '.join(all_exclude_keywords)}")
 
     def should_be_excluded(file_path: str) -> bool:
-        """Check if a file path should be excluded based on keywords."""
-        path_lower = file_path.lower()
-        for keyword in all_exclude_keywords:
-            if keyword.lower() in path_lower:
-                return True
-        return False
+        return is_path_excluded(file_path, all_exclude_keywords)
     # --- End of Exclusion Logic ---
 
     # --- DoS protection: file count and size limits ---
@@ -486,6 +482,20 @@ def main():
             validator_reasoning=validator_reasoning,
         )
         
+        coverage_notes = []
+        if excluded_files:
+            excluded_sorted = sorted(set(excluded_files))
+            coverage_notes.append(f"**Excluded from scan ({len(excluded_sorted)} file(s), path keywords):** " + ", ".join(f"`{f}`" for f in excluded_sorted[:20]) + (" ..." if len(excluded_sorted) > 20 else ""))
+        skipped_all = skipped_file_size + skipped_total_cap + skipped_file_cap
+        if skipped_all:
+            coverage_notes.append(f"**Skipped due to size/count limits ({len(skipped_all)} file(s)):** " + ", ".join(f"`{f}`" for f in skipped_all[:20]) + (" ..." if len(skipped_all) > 20 else ""))
+        if validated_vuln_ids is not None:
+            rejected_count = vulns_to_validate_count - len(validated_vuln_ids)
+            if rejected_count > 0:
+                coverage_notes.append(f"**Rejected by validator as false positive:** {rejected_count} finding(s)")
+        if coverage_notes:
+            markdown_report += "\n\n### Scan coverage\n\n" + "\n\n".join(coverage_notes) + "\n"
+
         # Save markdown report for GitHub Actions to use
         with open('pr_comment.md', 'w') as f:
             f.write(markdown_report)
