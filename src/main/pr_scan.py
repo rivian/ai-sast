@@ -20,7 +20,7 @@ from typing import Optional, List, Dict, Tuple
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.core.scanner import SecurityScanner
+from src.core.scanner import SecurityScanner, is_path_excluded
 from src.core.report import HTMLReportGenerator
 from src.core.validator import validate_findings
 
@@ -261,30 +261,7 @@ def main():
     print(f"ℹ️  Full list of exclusion keywords: {', '.join(all_exclude_keywords)}")
 
     def should_be_excluded(file_path: str) -> bool:
-        """Match keywords against whole path segments or name tokens, not substrings.
-
-        "test" matches tests/, test_x.py, x.test.js, __tests__/ but not latest.py;
-        "log" matches app.log, logs/ but not login.py. Keywords containing "/" match
-        as a path prefix or segment sequence; keywords containing "*" are fnmatch globs.
-        """
-        path_lower = file_path.lower().strip('/')
-        segments = [seg for seg in path_lower.split('/') if seg]
-        tokens = set(segments)
-        for seg in segments:
-            tokens.update(t for t in re.split(r'[._\-]+', seg) if t)
-        for keyword in all_exclude_keywords:
-            kw = keyword.lower().strip().strip('/')
-            if not kw:
-                continue
-            if '*' in kw or '?' in kw:
-                if fnmatch.fnmatch(path_lower, kw) or any(fnmatch.fnmatch(seg, kw) for seg in segments):
-                    return True
-            elif '/' in kw:
-                if path_lower == kw or path_lower.startswith(kw + '/') or f'/{kw}/' in f'/{path_lower}/':
-                    return True
-            elif kw in tokens or kw + 's' in tokens:
-                return True
-        return False
+        return is_path_excluded(file_path, all_exclude_keywords)
     # --- End of Exclusion Logic ---
 
     # --- DoS protection: file count and size limits ---

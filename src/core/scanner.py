@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
+import fnmatch
 import subprocess
 import tempfile
 import shutil
@@ -55,6 +56,35 @@ except ImportError:
     FEEDBACK_AVAILABLE = False
     get_feedback_client = None
 
+
+
+def is_path_excluded(file_path: str, keywords: List[str]) -> bool:
+    """Match exclusion keywords against whole path segments or name tokens, not substrings.
+
+    "test" matches tests/, test_x.py, x.test.js, __tests__/ but not latest.py;
+    "log" matches app.log, logs/ but not login.py. Keywords containing "/" match
+    as a path prefix or segment sequence; keywords containing "*" or "?" are fnmatch globs.
+    """
+    path_lower = file_path.lower().replace('\\', '/').strip('/')
+    if path_lower.startswith('./'):
+        path_lower = path_lower[2:]
+    segments = [seg for seg in path_lower.split('/') if seg]
+    tokens = set(segments)
+    for seg in segments:
+        tokens.update(t for t in re.split(r'[._\-]+', seg) if t)
+    for keyword in keywords:
+        kw = keyword.lower().strip().strip('/')
+        if not kw:
+            continue
+        if '*' in kw or '?' in kw:
+            if fnmatch.fnmatch(path_lower, kw) or any(fnmatch.fnmatch(seg, kw) for seg in segments):
+                return True
+        elif '/' in kw:
+            if path_lower == kw or path_lower.startswith(kw + '/') or f'/{kw}/' in f'/{path_lower}/':
+                return True
+        elif kw in tokens or kw + 's' in tokens:
+            return True
+    return False
 
 class SecurityScanner:
     """
@@ -132,6 +162,7 @@ Format your response for each finding as:
             location: GCP region (only for Vertex AI backend)
             repo_url: Repository URL for reference
         """
+        self.excluded_files: List[str] = []
         # Initialize LLM client based on AI_SAST_LLM (vertex | bedrock | ollama)
         if AI_SAST_LLM == "ollama":
             print(f"🔧 Initial scan LLM: Ollama (local), model: {OLLAMA_MODEL}")
@@ -595,12 +626,7 @@ Use the exact file path as written above for that file. Then provide your analys
         print(f"ℹ️ Full list of exclusion keywords: {', '.join(all_exclude_keywords)}")
 
         def should_be_excluded(file_path: str) -> bool:
-            """Check if a file path should be excluded based on keywords."""
-            path_lower = file_path.lower()
-            for keyword in all_exclude_keywords:
-                if keyword.lower() in path_lower:
-                    return True
-            return False
+            return is_path_excluded(file_path, all_exclude_keywords)
         # --- End of Exclusion Logic ---
 
         all_files: List[str] = []
@@ -625,6 +651,7 @@ Use the exact file path as written above for that file. Then provide your analys
             for file in sorted(list(set(excluded_files))):
                  print(f"- {file}")
             print("--------------------------------\n")
+        self.excluded_files = sorted(set(excluded_files))
 
         print(f"Found {len(all_files)} files to scan.")
         
